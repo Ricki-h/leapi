@@ -3,6 +3,8 @@ import cors from 'cors'
 import 'dotenv/config'
 import sequelize  from './config/database.js'
 
+import './models/User.js'
+
 const app = express()
 
 app.use(cors())
