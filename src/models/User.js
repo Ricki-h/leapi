@@ -32,12 +32,10 @@ const User = sequelize.define('User', {
             const today = new Date()
             const initAge = today.getFullYear() - birth.getFullYear()
             const monthDiff = today.getMonth() - birth.getMonth()
-            if (monthDiff < 0 || (monthDiff === 0 && today.getDay() < birth.getDay())) {
-                const age = initAge - 1
-            }
-            else {
-                const age = initAge
-            }
+
+            const age = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())
+            ? initAge - 1
+            : initAge
 
             if (age < 12) {
                 throw new Error('Você tem que ter no mínimo 12 anos para criar conta na plataforma.')

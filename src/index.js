@@ -2,7 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import 'dotenv/config'
 import sequelize  from './config/database.js'
-
+import authRoutes from './routes/authRoutes.js'
 import './models/User.js'
 
 const app = express()
@@ -10,9 +10,11 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+app.use('/auth', authRoutes)
 app.get('/', (req, res) => {
     res.json({ message: 'API funcionando' })
 })
+
 
 sequelize.authenticate()
   .then(() => {
