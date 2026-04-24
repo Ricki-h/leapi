@@ -8,5 +8,6 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
     },
     logging: false
 })
-
+// teste
 export default sequelize
+
