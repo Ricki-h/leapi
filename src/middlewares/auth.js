@@ -1,9 +1,9 @@
 import jwt from 'jsonwebtoken'
 
-export const authenticate = (req, res, next) => {
+export const authenticated = (req, res, next) => {
     const authHeader = req.headers.authorization
 
-    if (!authHeader || !authHeader.startWith('Bearer ')) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Token não fornecido.' })
     }
 
@@ -13,7 +13,14 @@ export const authenticate = (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
         req.user = decoded
         next()
-    } catch (err) [
-        return res.status(401).json({ })
-    ]
+    } catch (err) {
+        return res.status(401).json({ error: 'Token inválido ou expirado.' })
+    }
+}
+
+export const isAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Acesso negado.' })
+    }
+    next()
 }
