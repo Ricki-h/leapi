@@ -4,9 +4,18 @@ import 'dotenv/config'
 import sequelize  from './config/database.js'
 import authRoutes from './routes/authRoutes.js'
 import UserRoutes from './routes/userRoutes.js'
+import bookRoutes from './routes/bookRoutes.js'
 import './models/User.js'
 import './models/Follow.js'
-import { authenticated } from './middlewares/auth.js'
+import './models/User.js'
+import './models/Author.js'
+import './models/Genre.js'
+import './models/Book.js'
+import './models/BookList.js'
+import './models/BookListItem.js'
+import './models/Rating.js'
+import './models/Resenha.js'
+import './models/Follow.js'
 
 const app = express()
 
@@ -15,6 +24,7 @@ app.use(express.json())
 
 app.use('/auth', authRoutes)
 app.use('/users', UserRoutes)
+app.use('/books', bookRoutes)
 app.get('/', (req, res) => {
     res.json({ message: 'API funcionando' })
 })
