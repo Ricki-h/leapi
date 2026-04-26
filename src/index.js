@@ -4,6 +4,8 @@ import 'dotenv/config'
 import sequelize  from './config/database.js'
 import authRoutes from './routes/authRoutes.js'
 import UserRoutes from './routes/userRoutes.js'
+import './models/Follow.js'
+import './models/User.js'
 import { authenticated } from './middlewares/auth.js'
 
 const app = express()

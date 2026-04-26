@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt'
 import User from '../models/User.js'
+import Follow from '../models/Follow.js'
 
 export const getUser = async (req, res) => {
     try {
@@ -110,4 +111,33 @@ export const deleteMe = async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: err.message })
   }
+}
+
+export const followUser = async (req, res) => {
+    try {
+        const follower = await User.findByPk(req.user.id)
+        const following = await user.findOne({ where: { username: req.params.username } })
+
+        if (!following) {
+            return res.status(404).json({ error: 'Usuário não encontrado.' })
+        }
+
+        if (follower.id === following.id) {
+            return res.status(400).json({ error: 'Você não pode seguir a si mesmo.' })
+        }
+
+        const alreadyFollowing = await Follow.findOne({
+            where: { followerId: follower.id, followingId: following.id }
+        })
+
+        if (alreadyFollowing) {
+            await alreadyFollowing.destroy()
+            return res.json({ message: `Você deixou de seguir @${following.username}.` })
+        }
+
+        await Follow.create({ followerId: follower.id, followingId: following.id })
+        return res.json({ message: `Você está seguindo @${following.username}.` })
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
 }
