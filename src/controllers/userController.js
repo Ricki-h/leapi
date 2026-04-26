@@ -12,8 +12,15 @@ export const getUser = async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: 'Usuário não encontrado.' })
         }
+        
+        const followersCount = await Follow.count({ where: { followingId: user.id } })
+        const followingCount = await Follow.count({ where: { followerId: user.id } })
 
-        return res.json(user)
+        return res.json({
+            ...user.toJSON(),
+            followersCount,
+            followingCount
+        })
     } catch (err) {
         res.status(500).json({ error: err.message })
     }
@@ -116,7 +123,7 @@ export const deleteMe = async (req, res) => {
 export const followUser = async (req, res) => {
     try {
         const follower = await User.findByPk(req.user.id)
-        const following = await user.findOne({ where: { username: req.params.username } })
+        const following = await User.findOne({ where: { username: req.params.username } })
 
         if (!following) {
             return res.status(404).json({ error: 'Usuário não encontrado.' })
@@ -137,6 +144,50 @@ export const followUser = async (req, res) => {
 
         await Follow.create({ followerId: follower.id, followingId: following.id })
         return res.json({ message: `Você está seguindo @${following.username}.` })
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+}
+
+export const getFollowers = async (req, res) => {
+    try {
+        const user = await User.findOne({
+            where: { username: req.params.username },
+            include: [{
+                model: User,
+                as: 'followers',
+                attributes: ['id', 'name', 'username', 'avatarUrl'],
+                through: { attributes: [] }
+            }]
+        })
+
+        if (!user) {
+            res.status(404).json({ error: 'Usuário não encontrado.' })
+        }
+
+        return res.json(user.followers)
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+}
+
+export const getFollowing = async (req, res) => {
+    try {
+        const user = await User.findOne({
+            where: { username: req.params.username },
+            include: [{
+                model: User,
+                as: 'following',
+                attributes: ['id', 'name', 'username', 'avatarUrl'],
+                through: { attributes: [] }
+            }]
+        })
+
+        if (!user) {
+            res.status(404).json({ error: 'Usuário não encontrado.' })
+        }
+
+        return res.json(user.following)
     } catch (err) {
         res.status(500).json({ error: err.message })
     }

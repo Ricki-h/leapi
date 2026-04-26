@@ -22,7 +22,7 @@ User.belongsToMany(User, {
 User.belongsToMany(User, {
     through: Follow,
     as: 'followers',
-    foreignKey: 'FollowingId'
+    foreignKey: 'followingId'
 })
 
 export default Follow

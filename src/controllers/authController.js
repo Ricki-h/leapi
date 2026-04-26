@@ -34,9 +34,7 @@ export const register = async (req, res) => {
             emailVerifyToken
         })
 
-        console.log('Enviando email para:', email)
         await sendVerificationEmail(email, emailVerifyToken)
-        console.log('Email enviado!')
 
         return res.status(201).json({
             message: 'Conta criada! Verifique seu email para ativar sua conta.'
