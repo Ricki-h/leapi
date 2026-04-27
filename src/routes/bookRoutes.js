@@ -4,6 +4,6 @@ import { getBook, searchBooks } from "../controllers/bookController.js";
 const router = Router()
 
 router.get('/search', searchBooks)
-router.get(':id', getBook)
+router.get('/:id', getBook)
 
 export default router

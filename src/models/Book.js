@@ -35,7 +35,7 @@ const Book = sequelize.define('Book', {
         allowNull: true
     },
     language: {
-        type: DataTypes.STRING,
+        type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: true
     },
     pageCount: {
@@ -68,7 +68,7 @@ Book.belongsToMany(Genre, {
     as: 'genres',
     foreignKey: 'bookId'
 })
-Genre.belongsToMany(Genre, {
+Genre.belongsToMany(Book, {
     through: 'BookGenres',
     as: 'books',
     foreignKey: 'genreId'

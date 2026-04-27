@@ -3,8 +3,9 @@ import cors from 'cors'
 import 'dotenv/config'
 import sequelize  from './config/database.js'
 import authRoutes from './routes/authRoutes.js'
-import UserRoutes from './routes/userRoutes.js'
+import userRoutes from './routes/userRoutes.js'
 import bookRoutes from './routes/bookRoutes.js'
+import listRoutes from './routes/listRoutes.js'
 import './models/User.js'
 import './models/Follow.js'
 import './models/User.js'
@@ -23,8 +24,9 @@ app.use(cors())
 app.use(express.json())
 
 app.use('/auth', authRoutes)
-app.use('/users', UserRoutes)
+app.use('/users', userRoutes)
 app.use('/books', bookRoutes)
+app.use('/lists', listRoutes)
 app.get('/', (req, res) => {
     res.json({ message: 'API funcionando' })
 })
