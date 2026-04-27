@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database'); // Seu arquivo de configuração do Sequelize
+const sequelize = require('../config/database.js'); // Seu arquivo de configuração do Sequelize
 
 const Comment = sequelize.define('Comment', {
   id: {
