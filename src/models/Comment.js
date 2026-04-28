@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database.js'); // Seu arquivo de configuração do Sequelize
+import { DataTypes } from 'sequelize'
+import sequelize from '../config/database.js' // Seu arquivo de configuração do Sequelize
 
 const Comment = sequelize.define('Comment', {
   id: {
@@ -30,4 +30,5 @@ Comment.belongsTo(Comment, {
 // Comment.belongsTo(User, { foreignKey: 'userId' });
 // Comment.belongsTo(Post, { foreignKey: 'postId' });
 
-module.exports = Comment;
+
+export default Comment;

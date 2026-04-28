@@ -1,54 +1,75 @@
-const express = require('express');
-const router = express.Router();
-const Comment = require('../models/Comment'); // Seu modelo Comment
+import Comment from '../models/Comment'
+import User from '../models/User.js'
 
-// POST /api/comments - Criar um novo comentário
-router.post('/', async (req, res) => {
-  try {
-    const { content, userId, postId, parentId } = req.body;
-    const newComment = await Comment.create({ content, userId, postId, parentId });
-    res.status(201).json(newComment);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+export const createComment = async (req, res) => {
+    try {
+        const { content, postId, parentId } = req.body
+        const userId = req.user.id // Pegando do middleware de autenticação
 
-// GET /api/comments/:postId - Obter comentários de um post específico
-// Esta rota busca os comentários de nível superior e suas respostas aninhadas.
-router.get('/:postId', async (req, res) => {
-  try {
-    const postId = req.params.postId;
-    const comments = await Comment.findAll({
-      where: { postId, parentId: null }, // Busca apenas comentários de nível superior
-      include: [{
-        model: Comment,
-        as: 'Replies',
-        // Para buscar respostas aninhadas, você pode adicionar includes recursivos aqui
-        // No entanto, para profundidade arbitrária, é melhor processar no backend ou frontend
-        include: [{
-          model: Comment,
-          as: 'Replies',
-          // ... e assim por diante, ou usar uma função recursiva para construir a árvore
-        }]
-      }],
-      order: [['createdAt', 'ASC']],
-    });
+        const comment = await Comment.create({
+            content,
+            postId,
+            userId,
+            parentId: parentId || null
+        })
 
-    // Função auxiliar para construir a árvore de comentários (exemplo simplificado)
-    const buildCommentTree = (commentsArray) => {
-      return commentsArray.map(comment => {
-        const commentData = comment.toJSON();
-        if (commentData.Replies && commentData.Replies.length > 0) {
-          commentData.Replies = buildCommentTree(commentData.Replies);
+        return res.status(201).json(comment)
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
+
+export const getCommentsByPostId = async (req, res) => {
+    try {
+        const comments = await Comment.findAll({
+            where: { 
+                postId: req.params.postId,
+                parentId: null // Apenas comentários principais
+            },
+            include: [
+                {
+                    model: User,
+                    as: 'author',
+                    attributes: ['id', 'name', 'username', 'avatarUrl']
+                },
+                {
+                    model: Comment,
+                    as: 'replies',
+                    include: [
+                        {
+                            model: User,
+                            as: 'author',
+                            attributes: ['id', 'name', 'username', 'avatarUrl']
+                        }
+                    ]
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        })
+
+        return res.json(comments)
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
+
+export const deleteComment = async (req, res) => {
+    try {
+        const comment = await Comment.findByPk(req.params.id)
+
+        if (!comment) {
+            return res.status(404).json({ error: 'Comentário não encontrado.' })
         }
-        return commentData;
-      });
-    };
 
-    res.json(buildCommentTree(comments));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+        // Verifica se o usuário é o autor ou admin
+        if (comment.userId !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Acesso negado.' })
+        }
 
-module.exports = router;
+        await comment.destroy()
+
+        return res.json({ message: 'Comentário deletado com sucesso.' })
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}

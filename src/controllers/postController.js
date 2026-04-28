@@ -1,86 +1,82 @@
-const express = require("express");
-const router = express.Router();
-const Post = require("../models/Post"); // Seu modelo Post
-const Comment = require("../models/Comment"); // Seu modelo Comment
+import Post from '../models/Post.js'
+import Comment from '../models/Comment.js'
+import User from '../models/User.js'
 
-// POST /api/posts - Criar um novo post
-router.post("/", async (req, res) => {
-  try {
-    const { title, content, userId } = req.body;
-    const newPost = await Post.create({ title, content, userId });
-    res.status(201).json(newPost);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+export const createPost = async (req, res) => {
+    try {
+        const { title, content } = req.body
+        const userId = req.user.id // Pegando do middleware de autenticação
 
-// GET /api/posts - Listar todos os posts
-router.get("/", async (req, res) => {
-  try {
-    const posts = await Post.findAll({
-      include: [
-        {
-          model: Comment,
-          as: "Comments", // Opcional: para incluir comentários diretamente na listagem
-          // include: [{ model: Comment, as: 'Replies' }] // Se quiser incluir respostas aninhadas aqui
-        },
-        // Se você tiver um modelo User:
-        // { model: User, as: 'Author', attributes: ['id', 'name'] }
-      ],
-      order: [["createdAt", "DESC"]],
-    });
-    res.json(posts);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+        const post = await Post.create({
+            title,
+            content,
+            userId
+        })
 
-// GET /api/posts/:id - Obter um post específico por ID (com seus comentários)
-router.get("/:id", async (req, res) => {
-  try {
-    const postId = req.params.id;
-    const post = await Post.findByPk(postId, {
-      include: [
-        {
-          model: Comment,
-          as: "Comments",
-          where: { parentId: null }, 
-          required: false, 
-          include: [
-            {
-              model: Comment,
-              as: "Replies",
-              
-            },
-          ],
-        },
-        
-      ],
-    });
-
-    if (!post) {
-      return res.status(404).json({ message: "Post não encontrado" });
+        return res.status(201).json(post)
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
     }
+}
 
-    // Função auxiliar para construir a árvore de comentários (reutilizada do guia anterior)
-    const buildCommentTree = (commentsArray) => {
-      if (!commentsArray) return [];
-      return commentsArray.map((comment) => {
-        const commentData = comment.toJSON();
-        if (commentData.Replies && commentData.Replies.length > 0) {
-          commentData.Replies = buildCommentTree(commentData.Replies);
+export const getAllPosts = async (req, res) => {
+    try {
+        const posts = await Post.findAll({
+            include: [
+                {
+                    model: User,
+                    as: 'author',
+                    attributes: ['id', 'name', 'username', 'avatarUrl']
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        })
+
+        return res.json(posts)
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
+
+export const getPostById = async (req, res) => {
+    try {
+        const post = await Post.findByPk(req.params.id, {
+            include: [
+                {
+                    model: User,
+                    as: 'author',
+                    attributes: ['id', 'name', 'username', 'avatarUrl']
+                }
+            ]
+        })
+
+        if (!post) {
+            return res.status(404).json({ error: 'Post não encontrado.' })
         }
-        return commentData;
-      });
-    };
 
-    const postWithCommentTree = post.toJSON();
-    postWithCommentTree.Comments = buildCommentTree(postWithCommentTree.Comments);
+        return res.json(post)
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
 
-    res.json(postWithCommentTree);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+export const deletePost = async (req, res) => {
+    try {
+        const post = await Post.findByPk(req.params.id)
 
-module.exports = router;
+        if (!post) {
+            return res.status(404).json({ error: 'Post não encontrado.' })
+        }
+
+        // Verifica se o usuário é o autor ou admin
+        if (post.userId !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Acesso negado.' })
+        }
+
+        await post.destroy()
+
+        return res.json({ message: 'Post deletado com sucesso.' })
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}

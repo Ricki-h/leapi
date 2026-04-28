@@ -1,6 +1,6 @@
-const { DataTypes } = require("sequelize");
-const sequelize = require("../config/database.js"); // Seu arquivo de configuração do Sequelize
-const Comment = require("./Comment.js"); // Importa o modelo Comment
+import { DataTypes } from 'sequelize'
+import sequelize from '../config/database.js'
+import Comment from './Comment.js';
 // const User = require("./User"); // Se você tiver um modelo User
 
 const Post = sequelize.define("Post", {
@@ -33,4 +33,5 @@ Comment.belongsTo(Post, {
 // Post.belongsTo(User, { foreignKey: "userId" });
 // User.hasMany(Post, { foreignKey: "userId" });
 
-module.exports = Post;
+
+export default Post;

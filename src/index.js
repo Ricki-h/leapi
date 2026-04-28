@@ -4,8 +4,8 @@ import 'dotenv/config'
 import sequelize  from './config/database.js'
 import authRoutes from './routes/authRoutes.js'
 import UserRoutes from './routes/userRoutes.js'
-import commentRoutes from './routes/commentRoutes.js'
-import postRoutes from './routes/postRoutes.js'
+
+import PostRoutes from './routes/postRoutes.js'
 import './models/User.js'
 import './models/Follow.js'
 
@@ -23,8 +23,9 @@ app.get('/', (req, res) => {
 })
 
 
-app.use('/criar', authRoutes)
-app.use('')
+app.use('/post', PostRoutes)
+
+
 
 sequelize.authenticate()
   .then(() => {
