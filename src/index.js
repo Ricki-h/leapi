@@ -4,8 +4,11 @@ import 'dotenv/config'
 import sequelize  from './config/database.js'
 import authRoutes from './routes/authRoutes.js'
 import UserRoutes from './routes/userRoutes.js'
+import commentRoutes from './routes/commentRoutes.js'
+import postRoutes from './routes/postRoutes.js'
 import './models/User.js'
 import './models/Follow.js'
+
 import { authenticated } from './middlewares/auth.js'
 
 const app = express()
@@ -19,6 +22,9 @@ app.get('/', (req, res) => {
     res.json({ message: 'API funcionando' })
 })
 
+
+app.use('/criar', authRoutes)
+app.use('')
 
 sequelize.authenticate()
   .then(() => {
