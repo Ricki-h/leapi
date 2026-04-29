@@ -50,64 +50,110 @@ const saveBook = async (normalizedBook) => {
 
 export const searchBooks = async (req, res) => {
     try {
-        const { q } = req.query
+        const { q, author, genre, language, minPages, maxPages, year } = req.query
 
-        if (!q) {
-            return res.status(400).json({ error: 'Informe um temro de busca.' })
+        if (!q && !author && !genre && !language && !minPages && !maxPages && !year) {
+            return res.status(400).json({ error: 'Informe ao menos um termo de busca.' })
+        }
+
+        // Monta o where do livro
+        const bookWhere = {}
+        if (q) {
+            bookWhere.title = { [Op.iLike]: `%${q}%` }
+        }
+        if (minPages || maxPages) {
+            bookWhere.pageCount = {}
+            if (minPages) bookWhere.pageCount[Op.gte] = parseInt(minPages)
+            if (maxPages) bookWhere.pageCount[Op.lte] = parseInt(maxPages)
+        }
+        if (year) {
+            bookWhere.publishedYear = parseInt(year)
+        }
+        if (language) {
+            bookWhere.language = { [Op.contains]: [language] }
+        }
+
+        // Monta o where do autor
+        const authorWhere = {}
+        if (author) {
+        authorWhere.name = { [Op.iLike]: `%${author}%` }
+        }
+        if (q && !author) {
+        authorWhere[Op.or] = [
+            { name: { [Op.iLike]: `%${q}%` } }
+        ]
+        }
+
+        // Monta o where do gênero
+        const genreWhere = {}
+        if (genre) {
+        genreWhere.name = { [Op.iLike]: `%${genre}%` }
         }
 
         const localBooks = await Book.findAll({
-            where: { title: { [Op.iLike]: `%${q}%` } },
+            where: bookWhere,
             include: [
                 {
                     model: Author,
                     as: 'author',
-                    attributes: ['id', 'name']
+                    attributes: ['id', 'name'],
+                    where: Object.keys(authorWhere).length ? authorWhere : undefined,
+                    required: Object.keys(authorWhere).length > 0
                 },
                 {
                     model: Genre,
                     as: 'genres',
                     attributes: ['id', 'name'],
-                    through: { attributes: [] }
+                    through: { attributes: [] },
+                    where: Object.keys(genreWhere).length ? genreWhere : undefined,
+                    required: Object.keys(genreWhere).length > 0
                 }
             ],
-            limit: 10
+            limit: 20
         })
 
         if (localBooks >= 5) {
             return res.json(localBooks)
         }
 
-        const [googleResults, openLibraryResults] = await Promise.all([
-            searchGoogleBooks(q),
-            searchOpenLibrary(q)
-        ])
+        if (q) {
+            const searchTerm = author ? `${q} ${author}` : q
 
-        const allResults = [...googleResults, ...openLibraryResults]
+            const [googleResults, openLibraryResults] = await Promise.all([
+                searchGoogleBooks(searchTerm),
+                searchOpenLibrary(searchTerm)
+            ])
 
-        const savedBooks = await Promise.all(
-            allResults.map(book => saveBook(book))
-        ) 
+            const allResults = [...googleResults, ...openLibraryResults]
 
-        const books = await Book.findAll({
-            where: { title: { [Op.iLike]: `%${q}%` } },
-            include: [
+            await Promise.all(allResults.map(book => saveBook(book)))
+
+            const books = await Book.findAll({
+                where: bookWhere,
+                include: [
                 {
                     model: Author,
                     as: 'author',
-                    attributes: ['id', 'name']
+                    attributes: ['id', 'name'],
+                    where: Object.keys(authorWhere).length ? authorWhere : undefined,
+                    required: Object.keys(authorWhere).length > 0
                 },
                 {
                     model: Genre,
                     as: 'genres',
                     attributes: ['id', 'name'],
-                    through: { attributes: [] }
+                    through: { attributes: [] },
+                    where: Object.keys(genreWhere).length ? genreWhere : undefined,
+                    required: Object.keys(genreWhere).length > 0
                 }
-            ],
-            limit: 10
-        })
+                ],
+                limit: 20
+            })
+            return res.json(books)
+        }
 
-        return res.json(books)
+        return res.json(localBooks)
+
     } catch (err) {
         res.status(500).json({ error: err.message })
     }

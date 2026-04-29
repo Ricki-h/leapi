@@ -38,6 +38,19 @@ const normalizeOpenLibraryBook = (doc) => {
   }
 }
 
+const axiosRetry = async (url, options = {}, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await axios.get(url, { timeout: 8000, ...options })
+    } catch (err) {
+      const isLast = i === retries - 1
+      if (isLast) throw err
+      console.log(`Tentativa ${i + 1} falhou, tentando novamente...`)
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)))
+    }
+  }
+}
+
 export const searchGoogleBooks = async (query) => {
   try {
     const res = await axios.get('https://www.googleapis.com/books/v1/volumes', {
@@ -45,9 +58,9 @@ export const searchGoogleBooks = async (query) => {
         q: query,
         maxResults: 10,
         key: process.env.GOOGLE_BOOKS_KEY
-      }
+      },
+      timeout: 8000
     })
-    
     return (res.data.items || []).map(normalizeGoogleBook).filter(Boolean)
   } catch (err) {
     console.error('Erro Google Books:', err.message)
@@ -57,13 +70,10 @@ export const searchGoogleBooks = async (query) => {
 
 export const searchOpenLibrary = async (query) => {
   try {
-    const res = await axios.get('https://openlibrary.org/search.json', {
+    const res = await axiosRetry('https://openlibrary.org/search.json', {
       params: { q: query, limit: 10 }
     })
-    
-    const docs = res.data.docs || []
-    
-    return docs.map(normalizeOpenLibraryBook)
+    return (res.data.docs || []).map(normalizeOpenLibraryBook)
   } catch (err) {
     console.error('Erro Open Library:', err.message)
     return []
@@ -73,21 +83,20 @@ export const searchOpenLibrary = async (query) => {
 export const getOpenLibraryDetails = async (workId) => {
   try {
     const [workRes, editionsRes] = await Promise.all([
-      axios.get(`https://openlibrary.org${workId}.json`),
-      axios.get(`https://openlibrary.org${workId}/editions.json`)
+      axiosRetry(`https://openlibrary.org${workId}.json`),
+      axiosRetry(`https://openlibrary.org${workId}/editions.json`)
     ])
 
     const work = workRes.data
-    console.log('subjects do work:', work.subjects)
     const editions = editionsRes.data.entries || []
 
-    const bestEdition = editions.find(e => 
-        e.number_of_pages && 
-        e.isbn_13 && 
-        e.physical_format !== 'eAudiobook' &&
-        e.physical_format !== 'Audio CD'
-        ) || editions.find(e => 
-        e.number_of_pages
+    const bestEdition = editions.find(e =>
+      e.number_of_pages &&
+      e.isbn_13 &&
+      e.physical_format !== 'eAudiobook' &&
+      e.physical_format !== 'Audio CD'
+    ) || editions.find(e =>
+      e.number_of_pages
     ) || editions[0] || {}
 
     const description = typeof work.description === 'string'
@@ -103,13 +112,13 @@ export const getOpenLibraryDetails = async (workId) => {
     }
   } catch (err) {
     console.error('Erro detalhes Open Library:', err.message)
-    return { description: null, isbn: null, pageCount: null, publisher: null }
+    return { description: null, isbn: null, pageCount: null, publisher: null, genres: [] }
   }
 }
 
 export const getOpenLibraryAuthorDetails = async (authorId) => {
   try {
-    const res = await axios.get(`https://openlibrary.org${authorId}.json`)
+    const res = await axiosRetry(`https://openlibrary.org${authorId}.json`)
     const data = res.data
 
     const bio = typeof data.bio === 'string'

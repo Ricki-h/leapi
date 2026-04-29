@@ -39,7 +39,7 @@ const Book = sequelize.define('Book', {
         allowNull: true
     },
     pageCount: {
-        type: DataTypes.STRING,
+        type: DataTypes.INTEGER,
         allowNull: true
     },
     googleBooksId: {
