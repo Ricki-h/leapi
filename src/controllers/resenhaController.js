@@ -46,3 +46,63 @@ export const updateResenha = async (req, res) => {
         return res.status(500).json({ error: err.message })
     }
 }
+
+export const deleteResenha = async (req, res) => {
+    try {
+        const resenha = await Resenha.findOne({
+            where: { id: req.params.id }
+        })
+
+        if (!resenha) {
+            res.status(404).json({ error: 'Resenha não encontrada.' })
+        }
+
+        if (resenha.userId !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Sem permissão.' })
+        }
+
+        await resenha.destroy()
+
+        return res.json({ message: 'Resenha deletada.' })
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+}
+
+export const getBookResenhas = async (req, res) => {
+    try {
+        const resenhas = await Resenha.findAll({
+            where: { bookId: req.params.bookId },
+            include: [{
+                model: User,
+                as: 'user',
+                attributes: ['id', 'name', 'username', 'avatarUrl']
+            }],
+            order: [['createdAt', 'DESC']]
+        })
+
+        const average = resenhas.length ? (resenhas.reduce((sum, r) => sum + parseFloat(r.score), 0) / resenhas.length).toFixed(1) : null
+
+        return res.json({ average, total: resenhas.length, resenhas })
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
+
+export const getUserResenhas = async (req, res) => {
+    try {
+        const resenhas = await Resenha.findAll({
+            where: { userId: req.params.userId },
+            include: [{
+                model: Book,
+                as: 'book',
+                attributes: ['id', 'title', 'coverUrl']
+            }],
+            order: [['createdAt', 'DESC']]
+        })
+
+        return res.json(resenhas)
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+}
