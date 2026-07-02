@@ -4,6 +4,7 @@ import User from '../models/User.js'
 import { Op } from 'sequelize'
 import crypto from 'crypto'
 import { sendVerificationEmail, sendResetPasswordEmail } from '../services/emailService.js'
+import BookList from '../models/BookList.js'
 
 export const register = async (req, res) => {
     try {
@@ -33,6 +34,12 @@ export const register = async (req, res) => {
             birthDate,
             emailVerifyToken
         })
+
+        await BookList.bulkCreate([
+            { name: 'Pretendo ler', isDefault: true, isPrivate: false, userId: user.id },
+            { name: 'Lendo', isDefault: true, isPrivate: false, userId: user.id },
+            { name: 'Lido', isDefault: true, isPrivate: false, userId: user.id }
+        ])
 
         await sendVerificationEmail(email, emailVerifyToken)
 
