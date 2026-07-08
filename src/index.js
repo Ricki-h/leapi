@@ -6,6 +6,8 @@ import authRoutes from './routes/authRoutes.js'
 import userRoutes from './routes/userRoutes.js'
 import bookRoutes from './routes/bookRoutes.js'
 import listRoutes from './routes/listRoutes.js'
+import ratingRoutes from './routes/ratingRoutes.js'
+import resenhaRoutes from './routes/resenhaRoutes.js'
 import './models/User.js'
 import './models/Follow.js'
 import './models/User.js'
@@ -27,6 +29,8 @@ app.use('/auth', authRoutes)
 app.use('/users', userRoutes)
 app.use('/books', bookRoutes)
 app.use('/lists', listRoutes)
+app.use('/ratings', ratingRoutes)
+app.use('/resenhas', resenhaRoutes)
 app.get('/', (req, res) => {
     res.json({ message: 'API funcionando' })
 })
