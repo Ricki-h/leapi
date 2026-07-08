@@ -8,6 +8,7 @@ import bookRoutes from './routes/bookRoutes.js'
 import listRoutes from './routes/listRoutes.js'
 import ratingRoutes from './routes/ratingRoutes.js'
 import resenhaRoutes from './routes/resenhaRoutes.js'
+import postRoutes from './routes/postRoutes.js'
 import './models/User.js'
 import './models/Follow.js'
 import './models/User.js'
@@ -31,6 +32,7 @@ app.use('/books', bookRoutes)
 app.use('/lists', listRoutes)
 app.use('/ratings', ratingRoutes)
 app.use('/resenhas', resenhaRoutes)
+app.use('/posts', postRoutes)
 app.get('/', (req, res) => {
     res.json({ message: 'API funcionando' })
 })
