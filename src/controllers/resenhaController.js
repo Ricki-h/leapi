@@ -41,7 +41,20 @@ export const updateResenha = async (req, res) => {
             return res.status(404).json({ error: 'Resenha não encontrada.' })
         }
 
-        const {  }
+        const { score, body, writing, plot, characters, pacing, emotionalImpact, worldbuilding } = req.body
+
+        await resenha.update({
+            ...(score !== undefined && { score }),
+            ...(body !== undefined && { body }),
+            ...(writing !== undefined && { writing }),
+            ...(plot !== undefined && { plot }),
+            ...(characters !== undefined && { characters }),
+            ...(pacing !== undefined && { pacing }),
+            ...(emotionalImpact !== undefined && { emotionalImpact }),
+            ...(worldbuilding !== undefined && { worldbuilding })
+        })
+
+        return res.json(resenha)
     } catch (err) {
         return res.status(500).json({ error: err.message })
     }
