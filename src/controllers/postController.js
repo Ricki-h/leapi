@@ -59,6 +59,12 @@ export const getPost = async (req, res) => {
                 { model: User, as: 'user', attributes: userAttrs },
                 {
                     model: Post,
+                    as: 'parent',
+                    attributes: ['id'],
+                    include: [{ model: User, as: 'user', attributes: ['id', 'username'] }]
+                },
+                {
+                    model: Post,
                     as: 'replies',
                     attributes: {
                         include: [
