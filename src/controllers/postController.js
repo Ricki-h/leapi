@@ -61,7 +61,27 @@ export const getPost = async (req, res) => {
                     as: 'replies',
                     include: [{ model: User, as: 'user', attributes: userAttrs }]
                 }
-            ]
+            ],
+            attributes: {
+                include: [
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Likes" WHERE "Likes"."postId" = "Post"."id")`),
+                        'likesCount'
+                    ],
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Posts" AS "Replies" WHERE "Replies"."parentId" = "Post"."id")`),
+                        'repliesCount'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Likes" WHERE "Likes"."postId" = "Post"."id" AND "Likes"."userId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'likedByUser'
+                    ]
+                ]
+            },
         })
 
         if (!post) {
