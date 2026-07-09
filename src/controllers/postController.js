@@ -80,6 +80,22 @@ export const getPost = async (req, res) => {
                                 : 'FALSE'
                         ),
                         'likedByUser'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followingId" = "Post"."userId" AND "Follows"."followerId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'isFollowingAuthor'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followerId" = "Post"."userId" AND "Follows"."followingId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'authorFollowsYou'
                     ]
                 ]
             },
@@ -117,6 +133,22 @@ export const getUserPosts = async (req, res) => {
                                 : 'FALSE'
                         ),
                         'likedByUser'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followingId" = "Post"."userId" AND "Follows"."followerId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'isFollowingAuthor'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followerId" = "Post"."userId" AND "Follows"."followingId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'authorFollowsYou'
                     ]
                 ]
             },
@@ -151,6 +183,22 @@ export const getUserPostsAndReplies = async (req, res) => {
                                 : 'FALSE'
                         ),
                         'likedByUser'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followingId" = "Post"."userId" AND "Follows"."followerId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'isFollowingAuthor'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followerId" = "Post"."userId" AND "Follows"."followingId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'authorFollowsYou'
                     ]
                 ]
             },
@@ -200,6 +248,22 @@ export const getFeed = async (req, res) => {
                                 : 'FALSE'
                         ),
                         'likedByUser'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followingId" = "Post"."userId" AND "Follows"."followerId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'isFollowingAuthor'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followerId" = "Post"."userId" AND "Follows"."followingId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'authorFollowsYou'
                     ]
                 ]
             },
