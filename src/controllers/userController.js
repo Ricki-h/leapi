@@ -19,9 +19,7 @@ export const getUser = async (req, res) => {
         const followersCount = await Follow.count({ where: { followingId: user.id } })
         const followingCount = await Follow.count({ where: { followerId: user.id } })
 
-        const isFollowing = req.user
-            ? (await Follow.findOne({ where: { followerId: req.user.id, followingId: user.id } }))
-            : false
+        const isFollowing = await Follow.findOne({ where: { followerId: req.user.id, followingId: user.id } }) || false
 
         return res.json({
             ...user.toJSON(),
