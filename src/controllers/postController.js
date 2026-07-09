@@ -92,6 +92,14 @@ export const getUserPosts = async (req, res) => {
                     [
                         sequelize.literal(`(SELECT COUNT(*) FROM "Posts" AS "Replies" WHERE "Replies"."parentId" = "Post"."id")`),
                         'repliesCount'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Likes" WHERE "Likes"."postId" = "Post"."id" AND "Likes"."userId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'likedByUser'
                     ]
                 ]
             },
@@ -117,6 +125,14 @@ export const getUserPostsAndReplies = async (req, res) => {
                     [
                         sequelize.literal(`(SELECT COUNT(*) FROM "Posts" AS "Replies" WHERE "Replies"."parentId" = "Post"."id")`),
                         'repliesCount'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Likes" WHERE "Likes"."postId" = "Post"."id" AND "Likes"."userId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'likedByUser'
                     ]
                 ]
             },
