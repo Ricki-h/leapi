@@ -1,12 +1,15 @@
 import bcrypt from 'bcrypt'
 import User from '../models/User.js'
 import Follow from '../models/Follow.js'
+import cloudinary from '../config/cloudinary.js'
+
+const DEFAULT_AVATAR_URL = 'https://res.cloudinary.com/dogfe2npo/image/upload/v1777050334/deafultAvatar_1_yl8fl5.png'
 
 export const getUser = async (req, res) => {
     try {
         const user = await User.findOne({
             where: { username: req.params.username },
-            attributes: { exclude: ['password', 'emailVerifyToken', 'resetPasswordToken', 'resetPasswordExpires'] }
+            attributes: { exclude: 'password' }
         })
 
         if (!user) {
@@ -16,10 +19,15 @@ export const getUser = async (req, res) => {
         const followersCount = await Follow.count({ where: { followingId: user.id } })
         const followingCount = await Follow.count({ where: { followerId: user.id } })
 
+        const isFollowing = req.user
+            ? !!(await Follow.findOne({ where: { followerId: req.user.id, followingId: user.id } }))
+            : false
+
         return res.json({
             ...user.toJSON(),
             followersCount,
-            followingCount
+            followingCount,
+            isFollowing
         })
     } catch (err) {
         res.status(500).json({ error: err.message })
@@ -190,5 +198,60 @@ export const getFollowing = async (req, res) => {
         return res.json(user.following)
     } catch (err) {
         res.status(500).json({ error: err.message })
+    }
+}
+
+export const updateAvatar = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Nenhuma imagem enviada.' })
+        }
+
+        const user = await User.findByPk(req.user.id)
+
+        const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+                { folder: 'avatars' },
+                (err, result) => {
+                    if (err) return reject(err)
+                    resolve(result)
+                }
+            )
+            stream.end(req.file.buffer)
+        })
+
+        if (user.avatarCloudinaryId) {
+            await cloudinary.uploader.destroy(user.avatarCloudinaryId)
+        }
+
+        await user.update({
+            avatarUrl: uploadResult.secure_url,
+            avatarCloudinaryId: uploadResult.public_id
+        })
+
+        return res.json({
+            avatarUrl: user.avatarUrl
+        })
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
+
+export const removeAvatar = async (req, res) => {
+    try {
+        const user = await User.findByPk(req.user.id)
+
+        if (user.avatarCloudinaryId) {
+            await cloudinary.uploader.destroy(user.avatarCloudinaryId)
+        }
+
+        await user.update({
+            avatarUrl: DEFAULT_AVATAR_URL,
+            avatarCloudinaryId: null
+        })
+
+        return res.json({ message: 'Foto de perfil removida.', avatarUrl: DEFAULT_AVATAR_URL })
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
     }
 }
