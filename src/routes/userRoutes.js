@@ -5,9 +5,9 @@ import upload from '../middlewares/upload.js'
 
 const router = Router()
 
-router.get('/:username', getUser)
-router.get('/:username/followers', getFollowers)
-router.get('/:username/following', getFollowing)
+router.get('/:username', authenticated, getUser)
+router.get('/:username/followers', authenticated, getFollowers)
+router.get('/:username/following', authenticated, getFollowing)
 
 router.post('/:username/follow', authenticated, followUser)
 
