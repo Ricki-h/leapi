@@ -20,7 +20,7 @@ export const getUser = async (req, res) => {
         const followingCount = await Follow.count({ where: { followerId: user.id } })
 
         const isFollowing = req.user
-            ? !!(await Follow.findOne({ where: { followerId: req.user.id, followingId: user.id } }))
+            ? (await Follow.findOne({ where: { followerId: req.user.id, followingId: user.id } }))
             : false
 
         return res.json({
