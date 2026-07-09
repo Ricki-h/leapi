@@ -1,6 +1,8 @@
 import Post from '../models/Post.js'
 import Like from '../models/Like.js'
 import User from '../models/User.js'
+import sequelize from '../config/database.js'
+
 
 const userAttrs = ['id', 'name', 'username', 'avatarUrl']
 
@@ -81,6 +83,18 @@ export const getUserPosts = async (req, res) => {
     try {
         const posts = await Post.findAll({
             where: { userId: req.params.userId, parentId: null },
+            attributes: {
+                include: [
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Likes" WHERE "Likes"."postId" = "Post"."id")`),
+                        'likesCount'
+                    ],
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Posts" AS "Replies" WHERE "Replies"."parentId" = "Post"."id")`),
+                        'repliesCount'
+                    ]
+                ]
+            },
             order: [['createdAt', 'DESC']]
         })
 
@@ -94,6 +108,18 @@ export const getUserPostsAndReplies = async (req, res) => {
     try {
         const posts = await Post.findAll({
             where: { userId: req.params.userId },
+            attributes: {
+                include: [
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Likes" WHERE "Likes"."postId" = "Post"."id")`),
+                        'likesCount'
+                    ],
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Posts" AS "Replies" WHERE "Replies"."parentId" = "Post"."id")`),
+                        'repliesCount'
+                    ]
+                ]
+            },
             include: [
                 { model: User, as: 'user', attributes: userAttrs },
                 {
