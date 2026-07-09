@@ -81,6 +81,7 @@ export const getPost = async (req, res) => {
 
 export const getUserPosts = async (req, res) => {
     try {
+        const userId = req.user?.id || null
         const posts = await Post.findAll({
             where: { userId: req.params.userId, parentId: null },
             attributes: {
@@ -114,6 +115,7 @@ export const getUserPosts = async (req, res) => {
 
 export const getUserPostsAndReplies = async (req, res) => {
     try {
+        const userId = req.user?.id || null
         const posts = await Post.findAll({
             where: { userId: req.params.userId },
             attributes: {
