@@ -1,11 +1,12 @@
 import { Router } from "express";
-import { createPost, deletePost, getPost, getUserPosts, likePost, unlikePost, getUserPostsAndReplies } from "../controllers/postController.js";
+import { createPost, deletePost, getPost, getUserPosts, likePost, unlikePost, getUserPostsAndReplies, getFeed } from "../controllers/postController.js";
 import { authenticated } from "../middlewares/auth.js";
 
 
 const router = Router()
 
 router.post('/', authenticated, createPost)
+router.get('/feed', authenticated, getFeed)
 router.get('/:id', authenticated, getPost)
 router.get('/user/:userId', authenticated, getUserPosts)
 router.get('/user/:userId/all', authenticated, getUserPostsAndReplies)

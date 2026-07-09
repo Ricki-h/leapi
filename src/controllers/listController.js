@@ -25,6 +25,27 @@ export const getLists = async (req, res) => {
     }
 }
 
+export const getList = async (req, res) => {
+    try {
+        const list = await BookList.findByPk(req.params.id, {
+            include: [{
+                model: BookListItem,
+                as: 'items',
+                include: [{
+                    model: Book,
+                    as: 'book',
+                    include: [{ model: Author, as: 'author', attributes: ['id', 'name'] }],
+                    attributes: ['id', 'title', 'coverUrl', 'publishedYear']
+                }]
+                }]
+        })
+
+        return res.json(list)
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+}
+
 export const getMyLists = async (req, res) => {
     try {
         const lists = await BookList.findAll({

@@ -53,6 +53,7 @@ export const deletePost = async (req, res) => {
 
 export const getPost = async (req, res) => {
     try {
+        const userId = req.user?.id || null
         const post = await Post.findByPk(req.params.id, {
             include: [
                 { model: User, as: 'user', attributes: userAttrs },
@@ -88,12 +89,7 @@ export const getPost = async (req, res) => {
             return res.status(404).json({ error: 'Post não encontrado.' })
         }
 
-        const likesCount = await Like.count({ where: { postId: post.id } })
-        const likedByUser = req.user
-            ? !!(await Like.findOne({ where: { postId: post.id, userId: req.user.id } }))
-            : false
-
-        return res.json({ ...post.toJSON(), likesCount, likedByUser })
+        return res.json(post)
     } catch (err) {
         return res.status(500).json({ error: err.message })
     }
@@ -171,6 +167,58 @@ export const getUserPostsAndReplies = async (req, res) => {
         })
 
         return res.json(posts)
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
+
+export const getFeed = async (req, res) => {
+    try {
+        const userId = req.user?.id || null
+        const page = parseInt(req.query.page) || 1
+        const limit = 10
+        const offset = (page - 1) * limit
+
+        const seed = (req.query.seed || '').replace(/[^a-zA-Z0-9]/g, '') || Date.now().toString()
+
+        const posts = await Post.findAll({
+            where: { parentId: null },
+            attributes: {
+                include: [
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Likes" WHERE "Likes"."postId" = "Post"."id")`),
+                        'likesCount'
+                    ],
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Posts" AS "Replies" WHERE "Replies"."parentId" = "Post"."id")`),
+                        'repliesCount'
+                    ],
+                    [
+                        sequelize.literal(
+                            userId
+                                ? `EXISTS (SELECT 1 FROM "Likes" WHERE "Likes"."postId" = "Post"."id" AND "Likes"."userId" = '${userId}')`
+                                : 'FALSE'
+                        ),
+                        'likedByUser'
+                    ]
+                ]
+            },
+            include: [
+                { model: User, as: 'user', attributes: userAttrs }
+            ],
+            order: [[sequelize.literal(`md5("Post"."id"::text || '${seed}')`), 'ASC']],
+            limit,
+            offset
+        })
+
+        const hasMore = posts.length === limit
+
+        return res.json({
+            posts,
+            hasMore,
+            nextPage: hasMore ? page + 1 : null,
+            seed
+        })
     } catch (err) {
         return res.status(500).json({ error: err.message })
     }

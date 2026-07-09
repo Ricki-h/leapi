@@ -1,11 +1,12 @@
 import { Router } from 'express'
-import { getLists, createList, updateList, deleteList, addBookToList, removeBookFromList, getMyLists } from '../controllers/listController.js'
+import { getLists, createList, updateList, deleteList, addBookToList, removeBookFromList, getMyLists, getList } from '../controllers/listController.js'
 import { authenticated } from '../middlewares/auth.js'
 
 const router = Router()
 
 router.get('/me', authenticated, getMyLists)
-router.get('/user/:userId', getLists)
+router.get('/user/:userId', authenticated, getLists)
+router.get('/:id', authenticated, getList)
 router.post('/', authenticated, createList)
 router.patch('/:id', authenticated, updateList)
 router.delete('/:id', authenticated, deleteList)
