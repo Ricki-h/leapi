@@ -2,6 +2,7 @@ import Author from "../models/Author.js";
 import Book from "../models/Book.js";
 import BookList from "../models/BookList.js";
 import BookListItem from "../models/BookListItem.js";
+import User from "../models/User.js";
 
 export const getLists = async (req, res) => {
     try {
@@ -37,7 +38,12 @@ export const getList = async (req, res) => {
                     include: [{ model: Author, as: 'author', attributes: ['id', 'name'] }],
                     attributes: ['id', 'title', 'coverUrl', 'publishedYear']
                 }]
-                }]
+                },
+            {
+                model: User,
+                as: 'user',
+                attributes: ['id', 'name', 'username']
+            }]
         })
 
         return res.json(list)
