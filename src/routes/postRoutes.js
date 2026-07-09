@@ -1,14 +1,16 @@
 import { Router } from "express";
 import { createPost, deletePost, getPost, getUserPosts, likePost, unlikePost, getUserPostsAndReplies } from "../controllers/postController.js";
+import { authenticated } from "../middlewares/auth.js";
+
 
 const router = Router()
 
-router.post('/', createPost)
-router.get('/:id', getPost)
-router.get('/user/:userId', getUserPosts)
-router.get('/user/:userId/all', getUserPostsAndReplies)
-router.delete('/:id', deletePost)
-router.post('/:id/like', likePost)
-router.delete('/:id/like', unlikePost)
+router.post('/', authenticated, createPost)
+router.get('/:id', authenticated, getPost)
+router.get('/user/:userId', authenticated, getUserPosts)
+router.get('/user/:userId/all', authenticated, getUserPostsAndReplies)
+router.delete('/:id', authenticated, deletePost)
+router.post('/:id/like', authenticated, likePost)
+router.delete('/:id/like', authenticated, unlikePost)
 
 export default router
