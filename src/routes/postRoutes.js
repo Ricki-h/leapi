@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createPost, deletePost, getPost, getUserPosts, likePost, unlikePost, getUserPostsAndReplies, getFeed } from "../controllers/postController.js";
+import { createPost, deletePost, getPost, getUserPosts, likePost, unlikePost, getUserPostsAndReplies, getFeed, getFollowingFeed } from "../controllers/postController.js";
 import { authenticated } from "../middlewares/auth.js";
 
 
