@@ -7,6 +7,7 @@ const router = Router()
 
 router.post('/', authenticated, createPost)
 router.get('/feed', authenticated, getFeed)
+router.get('/feed/following', authenticated, getFollowingFeed)
 router.get('/:id', authenticated, getPost)
 router.get('/user/:userId', authenticated, getUserPosts)
 router.get('/user/:userId/all', authenticated, getUserPostsAndReplies)

@@ -2,7 +2,7 @@ import Post from '../models/Post.js'
 import Like from '../models/Like.js'
 import User from '../models/User.js'
 import sequelize from '../config/database.js'
-
+import { Op } from 'sequelize'
 
 const userAttrs = ['id', 'name', 'username', 'avatarUrl']
 
@@ -308,6 +308,69 @@ export const getFeed = async (req, res) => {
             hasMore,
             nextPage: hasMore ? page + 1 : null,
             seed
+        })
+    } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
+
+export const getFollowingFeed = async (req, res) => {
+    try {
+        const userId = req.user?.id
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Não autorizado.' })
+        }
+
+        const page = parseInt(req.query.page) || 1
+        const limit = 10
+        const offset = (page - 1) * limit
+
+        const posts = await Post.findAll({
+            where: {
+                parentId: null,
+                userId: {
+                    [Op.in]: sequelize.literal(`(SELECT "followingId" FROM "Follows" WHERE "followerId" = '${userId}')`)
+                }
+            },
+            attributes: {
+                include: [
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Likes" WHERE "Likes"."postId" = "Post"."id")`),
+                        'likesCount'
+                    ],
+                    [
+                        sequelize.literal(`(SELECT COUNT(*) FROM "Posts" AS "Replies" WHERE "Replies"."parentId" = "Post"."id")`),
+                        'repliesCount'
+                    ],
+                    [
+                        sequelize.literal(`EXISTS (SELECT 1 FROM "Likes" WHERE "Likes"."postId" = "Post"."id" AND "Likes"."userId" = '${userId}')`),
+                        'likedByUser'
+                    ],
+                    [
+                        sequelize.literal(`EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followingId" = "Post"."userId" AND "Follows"."followerId" = '${userId}')`),
+                        'isFollowingAuthor'
+                    ],
+                    [
+                        sequelize.literal(`EXISTS (SELECT 1 FROM "Follows" WHERE "Follows"."followerId" = "Post"."userId" AND "Follows"."followingId" = '${userId}')`),
+                        'authorFollowsYou'
+                    ]
+                ]
+            },
+            include: [
+                { model: User, as: 'user', attributes: userAttrs }
+            ],
+            order: [['createdAt', 'DESC']],
+            limit,
+            offset
+        })
+
+        const hasMore = posts.length === limit
+
+        return res.json({
+            posts,
+            hasMore,
+            nextPage: hasMore ? page + 1 : null
         })
     } catch (err) {
         return res.status(500).json({ error: err.message })

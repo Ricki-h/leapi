@@ -39,11 +39,11 @@ export const getList = async (req, res) => {
                     attributes: ['id', 'title', 'coverUrl', 'publishedYear']
                 }]
                 },
-            {
-                model: User,
-                as: 'user',
-                attributes: ['id', 'name', 'username']
-            }]
+                {
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'username']
+                }]
         })
 
         return res.json(list)
