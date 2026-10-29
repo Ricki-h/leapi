@@ -2,65 +2,128 @@ import Book from '../models/Book.js'
 import Rating from '../models/Rating.js'
 import User from '../models/User.js'
 
-export const createOrUpdateRating = async (req, res) => {
+export const createRating = async (req, res) => {
     try {
         const { leafs, comment } = req.body
         const { bookId } = req.params
 
+        if (leafs === undefined || typeof leafs !== 'number' || leafs < 1 || leafs > 5) {
+            return res.status(400).json({ error: 'A nota (leafs) é obrigatória e deve ser um número entre 1 e 5.' })
+        }
+
+        if (comment && (typeof comment !== 'string' || comment.length > 500)) {
+            return res.status(400).json({ error: 'O comentário deve ter no máximo 500 caracteres.' })
+        }
+
         const book = await Book.findByPk(bookId)
         if (!book) {
-            return res.status(404).json({ error: 'Livro não encontrado.' })
+            return res.status(404).json({ error: 'O livro pesquisado não foi encontrado.' })
         }
 
-        const [rating, created] = await Rating.findOrCreate({
-            where: { userId: req.user.id, bookId },
-            defaults: { leafs, comment, userId: req.user.id, bookId }
+        const existingRating = await Rating.findOne({
+            where: { userId: req.user.id, bookId }
         })
 
-        if (!created) {
-            await rating.update({ leafs, comment })
+        if (existingRating) {
+            return res.status(409).json({ error: 'Você já avaliou esse livro.' })
         }
 
-        return res.status(created ? 201 : 200).json(rating)
+        const rating = await Rating.create({
+            leafs, comment, userId: req.user.id, bookId
+        })
+
+        return res.status(201).json(rating)
     } catch (err) {
-        return res.status(500).json({ error: err.message })
+        console.error('Erro ao criar avaliação:', err)
+        return res.status(500).json({ error: 'Erro interno no servidor.' })
     }
 }
 
-export const deleteRating = async (req, res) => {
+export const updateRating = async (req, res) => {
     try {
+        const { leafs, comment } = req.body
+        const { bookId } = req.params
+
+        if (leafs === undefined || typeof leafs !== 'number' || leafs < 1 || leafs > 5) {
+            return res.status(400).json({ error: 'A nota (leafs) é obrigatória e deve ser um número entre 1 e 5.' })
+        }
+
+        if (comment && (typeof comment !== 'string' || comment.length > 500)) {
+            return res.status(400).json({ error: 'O comentário deve ter no máximo 500 caracteres.' })
+        }
+
         const rating = await Rating.findOne({
-            where: { userId: req.user.id, bookId: req.params.bookId }
+            where: { userId: req.user.id, bookId }
         })
 
         if (!rating) {
             return res.status(404).json({ error: 'Avaliação não encontrada.' })
         }
 
+        await rating.update({ leafs, comment })
+
+        return res.json(rating)
+    } catch (err) {
+        console.error('Erro ao atualizar avaliação:', err)
+        return res.status(500).json({ error: 'Erro interno no servidor.' })
+    }
+}
+
+export const deleteRating = async (req, res) => {
+    try {
+        const { bookId } = req.params
+
+        const whereClause = { bookId }
+        if (req.user.role !== 'admin') {
+            whereClause.userId = req.user.id
+        }
+
+        const rating = await Rating.findOne({ where: whereClause })
+        if (!rating) {
+            return res.status(404).json({ error: 'Avaliação não encontrada.' })
+        }
+
         await rating.destroy()
 
-        return res.json({ message: 'Avaliação removida.' })
+        return res.json({ message: 'Avaliação removida com sucesso.' })
     } catch (err) {
-        return res.status(500).json({ error: err.message })
+        console.error('Erro ao remover avaliação:', err)
+        return res.status(500).json({ error: 'Erro interno no servidor.' })
     }
 }
 
 export const getBookRatings = async (req, res) => {
     try {
-        const ratings = await Rating.findAll({
-            where: { bookId: req.params.bookId },
+        const { bookId } = req.params
+        
+        const page = parseInt(req.query.page) || 1
+        const limit = 10
+        const offset = (page - 1) * limit
+
+        const { count, rows: ratings } = await Rating.findAndCountAll({
+            where: { bookId },
             include: [{
                 model: User,
                 as: 'user',
                 attributes: ['id', 'name', 'username', 'avatarUrl']
             }],
-            order: [['createdAt', 'DESC']]
+            order: [['createdAt', 'DESC']],
+            limit,
+            offset
         })
 
-        const average = ratings.length ? (ratings.reduce((sum, r) => sum + r.leafs, 0) / ratings.length).toFixed(1) : null
+        const average = count ? (ratings.reduce((sum, r) => sum + r.leafs, 0) / ratings.length).toFixed(1) : null
+        const totalPages = Math.ceil(count / limit)
 
-        return res.json({ average, total: ratings.length, ratings })
+        return res.json({
+            average,
+            totalRatings: count,
+            currentPage: page,
+            totalPages,
+            ratings
+        })
     } catch (err) {
-        return res.status(500).json({ error: err.message })
+        console.error('Erro ao buscar avaliações:', err)
+        return res.status(500).json({ error: 'Erro interno no servidor.' })
     }
 }
