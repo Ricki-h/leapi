@@ -2,29 +2,33 @@ import { Op } from "sequelize";
 import Book from "../models/Book.js";
 import Author from "../models/Author.js";
 import Genre from "../models/Genre.js";
-import axios from 'axios'
-import { searchGoogleBooks, searchOpenLibrary, getOpenLibraryDetails, getOpenLibraryAuthorDetails } from '../services/bookService.js'
+import axios from 'axios';
+import { searchGoogleBooks, searchOpenLibrary, getOpenLibraryDetails, getOpenLibraryAuthorDetails } from '../services/bookService.js';
 
 const saveBook = async (normalizedBook) => {
-    const existing = await Book.findOne({
-        where: {
-            [Op.or]: [
-                normalizedBook.googleBooksId ? { googleBooksId: normalizedBook.googleBooksId } : null,
-                normalizedBook.openLibraryId ? { openLibraryId: normalizedBook.openLibraryId } : null,
-                normalizedBook.isbn ? { isbn: normalizedBook.isbn } : null
-            ].filter(Boolean)
-        }
-    })
+    // 1. Previne erro no Op.or se o livro não tiver nenhum dos 3 IDs
+    const orConditions = [
+        normalizedBook.googleBooksId ? { googleBooksId: normalizedBook.googleBooksId } : null,
+        normalizedBook.openLibraryId ? { openLibraryId: normalizedBook.openLibraryId } : null,
+        normalizedBook.isbn ? { isbn: normalizedBook.isbn } : null
+    ].filter(Boolean);
 
-    if (existing) return existing
+    if (orConditions.length > 0) {
+        const existing = await Book.findOne({ where: { [Op.or]: orConditions } });
+        if (existing) return existing;
+    }
 
+    // 2. Previne erro se o autor vier nulo ou indefinido da API
+    const authorName = normalizedBook.authorName ? String(normalizedBook.authorName).trim() : 'Autor Desconhecido';
+    
     const [author] = await Author.findOrCreate({
-        where: { name: normalizedBook.authorName.trim() },
-        defaults: { name: normalizedBook.authorName.trim() }
-    })
+        where: { name: authorName },
+        defaults: { name: authorName }
+    });
 
+    // 3. Garante que o livro tenha pelo menos um título (algumas APIs retornam undefined e o banco recusa)
     const book = await Book.create({
-        title: normalizedBook.title,
+        title: normalizedBook.title || 'Título Desconhecido',
         description: normalizedBook.description,
         coverUrl: normalizedBook.coverUrl,
         isbn: normalizedBook.isbn,
@@ -35,62 +39,77 @@ const saveBook = async (normalizedBook) => {
         googleBooksId: normalizedBook.googleBooksId,
         openLibraryId: normalizedBook.openLibraryId,
         authorId: author.id
-    })
+    });
 
-    for (const genreName of  normalizedBook.genres) {
-        if (!genreName) continue
-        const [genre] = await Genre.findOrCreate({
-            where: { name: genreName }
-        })
-        await book.addGenre(genre)
+    // 4. Previne erro se "genres" não for um array
+    if (Array.isArray(normalizedBook.genres)) {
+        for (const genreName of normalizedBook.genres) {
+            if (!genreName) continue;
+            const [genre] = await Genre.findOrCreate({
+                where: { name: genreName }
+            });
+            await book.addGenre(genre);
+        }
     }
 
-    return book
-}
+    return book;
+};
 
 export const searchBooks = async (req, res) => {
     try {
-        const { q, author, genre, language, minPages, maxPages, year } = req.query
+        const { q, author, genre, language, minPages, maxPages, year, minYear, maxYear, sortBy, sortOrder, page, limit } = req.query;
 
-        if (!q && !author && !genre && !language && !minPages && !maxPages && !year) {
-            return res.status(400).json({ error: 'Informe ao menos um termo de busca.' })
+        if (!q && !author && !genre && !language && !minPages && !maxPages && !year && !minYear && !maxYear) {
+            return res.status(400).json({ error: 'Informe ao menos um termo de busca.' });
         }
 
-        // Monta o where do livro
-        const bookWhere = {}
+        const pageNum = Math.max(parseInt(page) || 1, 1);
+        const limitNum = Math.min(parseInt(limit) || 20, 50);
+        const offset = (pageNum - 1) * limitNum;
+
+        const validSortFields = ['title', 'publishedYear', 'pageCount', 'createdAt'];
+        const sortField = validSortFields.includes(sortBy) ? sortBy : 'title';
+        const sortDir = sortOrder && ['asc', 'desc'].includes(sortOrder.toLowerCase()) ? sortOrder.toLowerCase() : 'asc';
+
+        const bookWhere = {};
         if (q) {
-            bookWhere.title = { [Op.iLike]: `%${q}%` }
+            bookWhere[Op.or] = [
+                { title: { [Op.iLike]: `%${q}%` } },
+                { '$author.name$': { [Op.iLike]: `%${q}%` } }
+            ];
+        }
+        if (author) {
+            bookWhere['$author.name$'] = { [Op.iLike]: `%${author}%` };
         }
         if (minPages || maxPages) {
-            bookWhere.pageCount = {}
-            if (minPages) bookWhere.pageCount[Op.gte] = parseInt(minPages)
-            if (maxPages) bookWhere.pageCount[Op.lte] = parseInt(maxPages)
+            bookWhere.pageCount = {};
+            if (minPages) bookWhere.pageCount[Op.gte] = parseInt(minPages);
+            if (maxPages) bookWhere.pageCount[Op.lte] = parseInt(maxPages);
         }
         if (year) {
-            bookWhere.publishedYear = parseInt(year)
+            bookWhere.publishedYear = parseInt(year);
+        }
+        if (minYear || maxYear) {
+            bookWhere.publishedYear = {};
+            if (minYear) bookWhere.publishedYear[Op.gte] = parseInt(minYear);
+            if (maxYear) bookWhere.publishedYear[Op.lte] = parseInt(maxYear);
         }
         if (language) {
-            bookWhere.language = { [Op.contains]: [language] }
+            bookWhere.language = { [Op.contains]: [language] };
         }
 
-        // Monta o where do autor
-        const authorWhere = {}
+        const authorWhere = {};
         if (author) {
-        authorWhere.name = { [Op.iLike]: `%${author}%` }
-        }
-        if (q && !author) {
-        authorWhere[Op.or] = [
-            { name: { [Op.iLike]: `%${q}%` } }
-        ]
+            authorWhere.name = { [Op.iLike]: `%${author}%` };
         }
 
-        // Monta o where do gênero
-        const genreWhere = {}
+        const genreWhere = {};
         if (genre) {
-        genreWhere.name = { [Op.iLike]: `%${genre}%` }
+            genreWhere.name = { [Op.iLike]: `%${genre}%` };
         }
 
-        const localBooks = await Book.findAll({
+        // Busca local inicial
+        const { rows: localBooks, count: localCount } = await Book.findAndCountAll({
             where: bookWhere,
             include: [
                 {
@@ -98,7 +117,7 @@ export const searchBooks = async (req, res) => {
                     as: 'author',
                     attributes: ['id', 'name'],
                     where: Object.keys(authorWhere).length ? authorWhere : undefined,
-                    required: Object.keys(authorWhere).length > 0
+                    required: Object.keys(authorWhere).length > 0 || !!q
                 },
                 {
                     model: Genre,
@@ -109,34 +128,68 @@ export const searchBooks = async (req, res) => {
                     required: Object.keys(genreWhere).length > 0
                 }
             ],
-            limit: 20
-        })
+            order: [[sortField, sortDir]],
+            limit: limitNum,
+            offset: offset
+        });
 
-        if (localBooks >= 5) {
-            return res.json(localBooks)
+        // Se encontrou no banco local, retorna imediatamente
+        if (localCount >= limitNum) {
+            return res.json({
+                books: localBooks,
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total: localCount,
+                    pages: Math.ceil(localCount / limitNum)
+                },
+                source: 'local'
+            });
         }
 
-        if (q) {
-            const searchTerm = author ? `${q} ${author}` : q
+        const searchTerms = [];
+        if (q) searchTerms.push(q);
+        if (author) searchTerms.push(author);
+        if (genre) searchTerms.push(genre);
 
-            const [googleResults, openLibraryResults] = await Promise.all([
-                searchGoogleBooks(searchTerm),
-                searchOpenLibrary(searchTerm)
-            ])
+        const searchQuery = searchTerms.filter(Boolean).join(' ').trim() || q || '';
 
-            const allResults = [...googleResults, ...openLibraryResults]
+        // Busca externa se a local não foi suficiente
+        let externalResults = [];
+        if (searchQuery) {
+            try {
+                console.log(`Pesquisando nas APIs externas por: "${searchQuery}"`);
 
-            await Promise.all(allResults.map(book => saveBook(book)))
+                const [googleResults, openLibraryResults] = await Promise.all([
+                    searchGoogleBooks(searchQuery),
+                    searchOpenLibrary(searchQuery)
+                ]);
 
-            const books = await Book.findAll({
-                where: bookWhere,
-                include: [
+                externalResults = [...(googleResults || []), ...(openLibraryResults || [])];
+                console.log(`Encontrados: ${externalResults.length} livros nas APIs.`);
+
+                if (externalResults.length > 0) {
+                    
+                    await Promise.all(
+                        externalResults.map(book => saveBook(book))
+                    );
+                    console.log('Livros externos salvos no banco local com sucesso!');
+                }
+            } catch (apiError) {
+                console.error('Erro detalhado no bloco externo (salvamento ou API):', apiError);
+            }
+        }
+
+        // Refaz a busca local agora incluindo os dados que acabaram de ser salvos
+        const { rows: books, count: totalCount } = await Book.findAndCountAll({
+            where: bookWhere,
+            include: [
                 {
                     model: Author,
                     as: 'author',
                     attributes: ['id', 'name'],
                     where: Object.keys(authorWhere).length ? authorWhere : undefined,
-                    required: Object.keys(authorWhere).length > 0
+                    required: Object.keys(authorWhere).length > 0 || !!q
                 },
                 {
                     model: Genre,
@@ -146,82 +199,91 @@ export const searchBooks = async (req, res) => {
                     where: Object.keys(genreWhere).length ? genreWhere : undefined,
                     required: Object.keys(genreWhere).length > 0
                 }
-                ],
-                limit: 20
-            })
-            return res.json(books)
-        }
+            ],
+            order: [[sortField, sortDir]],
+            limit: limitNum,
+            offset: offset
+        });
 
-        return res.json(localBooks)
+        return res.json({
+            books: books,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total: totalCount,
+                pages: Math.ceil(totalCount / limitNum)
+            },
+            source: totalCount > localCount ? 'mixed' : 'local'
+        });
 
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        console.error('Error in searchBooks:', err.message);
+        res.status(500).json({ error: 'Erro interno do servidor' });
     }
-}
+};
 
 export const getBook = async (req, res) => {
-  try {
-    const book = await Book.findByPk(req.params.id, {
-      include: [
-        { model: Author, as: 'author', attributes: ['id', 'name', 'bio', 'photoUrl'] },
-        { model: Genre, as: 'genres', attributes: ['id', 'name'], through: { attributes: [] } }
-      ]
-    })
+    try {
+        const book = await Book.findByPk(req.params.id, {
+            include: [
+                { model: Author, as: 'author', attributes: ['id', 'name', 'bio', 'photoUrl'] },
+                { model: Genre, as: 'genres', attributes: ['id', 'name'], through: { attributes: [] } }
+            ]
+        });
 
-    if (!book) {
-      return res.status(404).json({ error: 'Livro não encontrado.' })
-    }
+        if (!book) {
+            return res.status(404).json({ error: 'Livro não encontrado.' });
+        }
 
-    if (!book.description && book.openLibraryId) {
-        const details = await getOpenLibraryDetails(book.openLibraryId)
-  
-        const updates = {}
-        if (details.description && !book.description) updates.description = details.description
-        if (details.isbn && !book.isbn) updates.isbn = details.isbn
-        if (details.pageCount && !book.pageCount) updates.pageCount = details.pageCount
-        if (details.publisher && !book.publisher) updates.publisher = details.publisher
-        if (details.genres?.length > 0) {
-            for (const genreName of details.genres) {
-                const [genre] = await Genre.findOrCreate({ where: { name: genreName } })
-                await book.addGenre(genre)
+        if (!book.description && book.openLibraryId) {
+            const details = await getOpenLibraryDetails(book.openLibraryId);
+
+            const updates = {};
+            if (details.description && !book.description) updates.description = details.description;
+            if (details.isbn && !book.isbn) updates.isbn = details.isbn;
+            if (details.pageCount && !book.pageCount) updates.pageCount = details.pageCount;
+            if (details.publisher && !book.publisher) updates.publisher = details.publisher;
+            if (details.genres?.length > 0) {
+                for (const genreName of details.genres) {
+                    const [genre] = await Genre.findOrCreate({ where: { name: genreName } });
+                    await book.addGenre(genre);
+                }
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await book.update(updates);
+                Object.assign(book, updates);
             }
         }
 
-        if (Object.keys(updates).length > 0) {
-            await book.update(updates)
-            Object.assign(book, updates)
+        if (book.author && !book.author.bio && book.openLibraryId) {
+            try {
+                const searchRes = await axios.get('https://openlibrary.org/search.json', {
+                    params: { q: book.title, limit: 1 }
+                });
+                const authorKey = searchRes.data.docs?.[0]?.author_key?.[0];
+                if (authorKey) {
+                    const authorDetails = await getOpenLibraryAuthorDetails(`/authors/${authorKey}`); 
+                    if (authorDetails.bio || authorDetails.photoUrl) {
+                        await book.author.update(authorDetails);
+                        book.author.bio = authorDetails.bio;
+                        book.author.photoUrl = authorDetails.photoUrl;
+                    }
+                }
+            } catch (err) {
+                console.error('Erro buscando autor:', err.message);
+            }
         }
 
+        const updatedBook = await Book.findByPk(req.params.id, {
+            include: [
+                { model: Author, as: 'author', attributes: ['id', 'name', 'bio', 'photoUrl'] },
+                { model: Genre, as: 'genres', attributes: ['id', 'name'], through: { attributes: [] } }
+            ]
+        });
+
+        return res.json(updatedBook);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
-
-    if (book.author && !book.author.bio && book.openLibraryId) {
-      try {
-        const searchRes = await axios.get('https://openlibrary.org/search.json', {
-          params: { q: book.title, limit: 1 }
-        })
-        const authorKey = searchRes.data.docs?.[0]?.author_key?.[0]
-        if (authorKey) {
-          const authorDetails = await getOpenLibraryAuthorDetails(`/authors/${authorKey}`)
-          if (authorDetails.bio || authorDetails.photoUrl) {
-            await book.author.update(authorDetails)
-            book.author.bio = authorDetails.bio
-            book.author.photoUrl = authorDetails.photoUrl
-          }
-        }
-      } catch (err) {
-        console.error('Erro buscando autor:', err.message)
-      }
-    }
-
-    const updatedBook = await Book.findByPk(req.params.id, {
-        include: [
-            { model: Author, as: 'author', attributes: ['id', 'name', 'bio', 'photoUrl'] },
-            { model: Genre, as: 'genres', attributes: ['id', 'name'], through: { attributes: [] } }
-        ]
-    })
-
-    return res.json(updatedBook)
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
-  }
-}
+};

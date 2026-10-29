@@ -43,16 +43,13 @@ export const register = async (req, res) => {
             { expiresIn: '7d' }
         )
 
-        return res.status(201).json({
-            token,
-            user: {
-                id: user.id,
-                name: user.name,
-                username: user.username,
-                email: user.email,
-                role: user.role
-            }
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: false,
+            maxAge: 36 * 100000 * 24 * 7
         })
+
+        return res.json({ message: 'Login realizado com sucesso!' })
     } catch (err) {
         return res.status(400).json({ error: err.message })
     }
@@ -83,17 +80,13 @@ export const login = async (req, res) => {
             { expiresIn: '7d' }
         )
 
-        return res.json({
-            token,
-            user: {
-                id: user.id,
-                name: user.name,
-                username: user.username,
-                email: user.email,
-                role: user.role,
-                avatarUrl: user.avatarUrl
-            }
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            secure: false,
+            maxAge: 36 * 100000 * 24 * 7
         })
+
+        return res.json({ message: 'Login realizado com sucesso!' })
     } catch (err) {
         return res.status(500).json({ error: err.message })
     }

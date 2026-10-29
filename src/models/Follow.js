@@ -1,4 +1,4 @@
-import { DataTypes, UUID } from "sequelize";
+import { DataTypes } from "sequelize";
 import sequelize from "../config/database.js";
 import User from "./User.js";
 
@@ -11,6 +11,10 @@ const Follow = sequelize.define('Follow', {
         type: DataTypes.UUID,
         allowNull: false
     }
+}, {
+    indexes: [
+        { unique: true, fields: ['followerId', 'followingId'] }
+    ]
 })
 
 User.belongsToMany(User, {
