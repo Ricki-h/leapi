@@ -5,7 +5,7 @@ import User from '../models/User.js'
 export const createResenha = async (req, res) => {
     try {
         const { bookId } = req.params
-        const { score, body, writing, plot, characters, pacing, emotionalImpact, worldbuilding } = req.body
+        const { body, writing, plot, characters, pacing, emotionalImpact, worldbuilding } = req.body
 
         const book = await Book.findByPk(bookId)
         if (!book) {
@@ -20,7 +20,7 @@ export const createResenha = async (req, res) => {
         }
 
         const resenha = await Resenha.create({
-            score, body, writing, plot, characters,
+            body, writing, plot, characters,
             pacing, emotionalImpact, worldbuilding,
             userId: req.user.id,
             bookId
@@ -28,37 +28,31 @@ export const createResenha = async (req, res) => {
 
         return res.status(201).json(resenha)
     } catch (err) {
-        return res.status(500).json({ error: err.message })
+        return res.status(500).json({ error: 'Erro ao criar uma resenha.' })
     }
 }
 
 export const updateResenha = async (req, res) => {
     try {
-        const resenha = await Resenha.findOne({
-            where: { id: req.params.id, userId: req.user.id }
-        })
-        if(!resenha) {
-            return res.status(404).json({ error: 'Resenha não encontrada.' })
+            const resenha = await Resenha.findOne({
+                where: { id: req.params.id, userId: req.user.id }
+            })
+            if(!resenha) {
+                return res.status(404).json({ error: 'Resenha não encontrada.' })
+            }
+
+            const FIELDS = ['body', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
+            const pick = (obj, keys) =>
+                Object.fromEntries(keys.filter(k => obj[k] !== undefined).map(k => [k, obj[k]]))
+
+            resenha.set(pick(req.body, FIELDS))
+            await resenha.save()
+
+            return res.json(resenha)
+            } catch (err) {
+                return res.status(500).json({ error: 'Erro ao atualizar resenha' })
+            }
         }
-
-        const { score, body, writing, plot, characters, pacing, emotionalImpact, worldbuilding } = req.body
-
-        await resenha.update({
-            ...(score !== undefined && { score }),
-            ...(body !== undefined && { body }),
-            ...(writing !== undefined && { writing }),
-            ...(plot !== undefined && { plot }),
-            ...(characters !== undefined && { characters }),
-            ...(pacing !== undefined && { pacing }),
-            ...(emotionalImpact !== undefined && { emotionalImpact }),
-            ...(worldbuilding !== undefined && { worldbuilding })
-        })
-
-        return res.json(resenha)
-    } catch (err) {
-        return res.status(500).json({ error: err.message })
-    }
-}
 
 export const deleteResenha = async (req, res) => {
     try {
@@ -67,7 +61,7 @@ export const deleteResenha = async (req, res) => {
         })
 
         if (!resenha) {
-            res.status(404).json({ error: 'Resenha não encontrada.' })
+            return res.status(404).json({ error: 'Resenha não encontrada.' })
         }
 
         if (resenha.userId !== req.user.id && req.user.role !== 'admin') {
@@ -78,7 +72,7 @@ export const deleteResenha = async (req, res) => {
 
         return res.json({ message: 'Resenha deletada.' })
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: 'Erro ao deletar resenha.' })
     }
 }
 
@@ -98,7 +92,7 @@ export const getBookResenhas = async (req, res) => {
 
         return res.json({ average, total: resenhas.length, resenhas })
     } catch (err) {
-        return res.status(500).json({ error: err.message })
+        return res.status(500).json({ error: 'Erro ao carreegar resenhas do livro' })
     }
 }
 
@@ -116,6 +110,6 @@ export const getUserResenhas = async (req, res) => {
 
         return res.json(resenhas)
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: 'Erro ao carregar resenhas do usuário' })
     }
 }

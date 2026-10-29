@@ -3,6 +3,20 @@ import sequelize from "../config/database.js";
 import User from "./User.js";
 import Book from "./Book.js";
 
+const CATEGORY_FIELDS = ['writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
+
+const calculateScore = (resenha) => {
+    const values = CATEGORY_FIELDS
+        .map(field => resenha[field])
+        .filter(v => v !== null && v !== undefined)
+        .map(Number)
+
+    if (values.length === 0) return null
+
+    const average = values.reduce((sum, v) => sum + v, 0) / values.length
+    return Math.round(average * 2 * 10) / 10 // escala 0-10 com 1 casa decimal
+}
+
 const Resenha = sequelize.define('Resenha', {
     id: {
         type: DataTypes.UUID,
@@ -47,6 +61,12 @@ const Resenha = sequelize.define('Resenha', {
         type: DataTypes.INTEGER,
         allowNull: true,
         validate: { min: 1, max: 5 }
+    }
+}, {
+    hooks: {
+        beforeValidate: (resenha) => {
+            resenha.score = calculateScore(resenha)
+        }
     }
 })
 
