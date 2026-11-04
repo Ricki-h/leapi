@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt'
 import User from '../models/User.js'
 import Follow from '../models/Follow.js'
 import cloudinary from '../config/cloudinary.js'
+import { Op } from 'sequelize'
 
 const DEFAULT_AVATAR_URL = 'https://res.cloudinary.com/dogfe2npo/image/upload/v1777050334/deafultAvatar_1_yl8fl5.png'
 
@@ -250,6 +251,34 @@ export const removeAvatar = async (req, res) => {
 
         return res.json({ message: 'Foto de perfil removida.', avatarUrl: DEFAULT_AVATAR_URL })
     } catch (err) {
+        return res.status(500).json({ error: err.message })
+    }
+}
+
+export const searchUsers = async (req, res) => {
+    try {
+        const { q } = req.query
+
+        if (!q || !q.trim()) {
+            return res.json([])
+        }
+
+        const query = `%${q.trim()}%`
+
+        const users = await User.findAll({
+            where: {
+                [Op.or]: [
+                    { name: { [Op.iLike]: query } },
+                    { username: { [Op.iLike]: query } }
+                ]
+            },
+            attributes: ['id', 'name', 'username', 'avatarUrl'],
+            limit: 10
+        })
+
+        return res.json(users)
+    } catch (err) {
+        console.error('Erro no searchUsers:', err)
         return res.status(500).json({ error: err.message })
     }
 }
