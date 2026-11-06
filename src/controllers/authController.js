@@ -4,6 +4,21 @@ import User from '../models/User.js'
 import { Op } from 'sequelize'
 import BookList from '../models/BookList.js'
 
+const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 1000 * 60 * 60 * 24 * 7 // 7 dias
+}
+
+const publicUser = (user) => ({
+    id: user.id,
+    name: user.name,
+    username: user.username,
+    avatarUrl: user.avatarUrl,
+    role: user.role
+})
+
 export const register = async (req, res) => {
     try {
         const { name, username, email, password, birthDate } = req.body
@@ -43,13 +58,9 @@ export const register = async (req, res) => {
             { expiresIn: '7d' }
         )
 
-        res.cookie('auth_token', token, {
-            httpOnly: true,
-            secure: false,
-            maxAge: 36 * 100000 * 24 * 7
-        })
+        res.cookie('auth_token', token, cookieOptions)
 
-        return res.json({ message: 'Login realizado com sucesso!' })
+        return res.json({ message: 'Login realizado com sucesso!', user: publicUser(user) })
     } catch (err) {
         return res.status(400).json({ error: err.message })
     }
@@ -80,14 +91,15 @@ export const login = async (req, res) => {
             { expiresIn: '7d' }
         )
 
-        res.cookie('auth_token', token, {
-            httpOnly: true,
-            secure: false,
-            maxAge: 36 * 100000 * 24 * 7
-        })
+        res.cookie('auth_token', token, cookieOptions)
 
-        return res.json({ message: 'Login realizado com sucesso!' })
+        return res.json({ message: 'Login realizado com sucesso!', user: publicUser(user) })
     } catch (err) {
         return res.status(500).json({ error: err.message })
     }
+}
+
+export const logout = (req, res) => {
+    res.clearCookie('auth_token', { ...cookieOptions, maxAge: undefined })
+    return res.json({ message: 'Logout realizado.' })
 }
