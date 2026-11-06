@@ -2,10 +2,45 @@ import Resenha from '../models/Resenha.js'
 import Book from '../models/Book.js'
 import User from '../models/User.js'
 
+const NOTA_MAX = 10
+const FIELDS = ['body', 'score', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
+const NOTAS = ['score', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
+const NOTAS_OBRIGATORIAS = ['score', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact']
+
+const pick = (obj, keys) =>
+    Object.fromEntries(keys.filter(k => obj[k] !== undefined).map(k => [k, obj[k]]))
+
+// Retorna uma mensagem de erro, ou null se estiver tudo certo
+function validar(dados, { parcial = false } = {}) {
+    if (!parcial) {
+        if (!dados.body || String(dados.body).trim() === '') {
+            return 'Escreva o texto da resenha.'
+        }
+        if (NOTAS_OBRIGATORIAS.some(k => dados[k] === undefined || dados[k] === null)) {
+            return 'Preencha todas as notas obrigatórias.'
+        }
+    }
+
+    for (const k of NOTAS) {
+        if (dados[k] === undefined || dados[k] === null) continue
+        const n = Number(dados[k])
+        if (isNaN(n) || n < 0 || n > NOTA_MAX) {
+            return `A nota deve ser um número entre 0 e ${NOTA_MAX}.`
+        }
+    }
+
+    return null
+}
+
 export const createResenha = async (req, res) => {
     try {
         const { bookId } = req.params
-        const { body, writing, plot, characters, pacing, emotionalImpact, worldbuilding } = req.body
+        const dados = pick(req.body, FIELDS)
+
+        const erro = validar(dados)
+        if (erro) {
+            return res.status(400).json({ error: erro })
+        }
 
         const book = await Book.findByPk(bookId)
         if (!book) {
@@ -20,39 +55,44 @@ export const createResenha = async (req, res) => {
         }
 
         const resenha = await Resenha.create({
-            body, writing, plot, characters,
-            pacing, emotionalImpact, worldbuilding,
+            ...dados,
+            body: String(dados.body).trim(),
             userId: req.user.id,
             bookId
         })
 
         return res.status(201).json(resenha)
     } catch (err) {
+        console.error('createResenha:', err)
         return res.status(500).json({ error: 'Erro ao criar uma resenha.' })
     }
 }
 
 export const updateResenha = async (req, res) => {
     try {
-            const resenha = await Resenha.findOne({
-                where: { id: req.params.id, userId: req.user.id }
-            })
-            if(!resenha) {
-                return res.status(404).json({ error: 'Resenha não encontrada.' })
-            }
-
-            const FIELDS = ['body', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
-            const pick = (obj, keys) =>
-                Object.fromEntries(keys.filter(k => obj[k] !== undefined).map(k => [k, obj[k]]))
-
-            resenha.set(pick(req.body, FIELDS))
-            await resenha.save()
-
-            return res.json(resenha)
-            } catch (err) {
-                return res.status(500).json({ error: 'Erro ao atualizar resenha' })
-            }
+        const resenha = await Resenha.findOne({
+            where: { id: req.params.id, userId: req.user.id }
+        })
+        if (!resenha) {
+            return res.status(404).json({ error: 'Resenha não encontrada.' })
         }
+
+        const dados = pick(req.body, FIELDS)
+
+        const erro = validar(dados, { parcial: true })
+        if (erro) {
+            return res.status(400).json({ error: erro })
+        }
+
+        resenha.set(dados)
+        await resenha.save()
+
+        return res.json(resenha)
+    } catch (err) {
+        console.error('updateResenha:', err)
+        return res.status(500).json({ error: 'Erro ao atualizar resenha.' })
+    }
+}
 
 export const deleteResenha = async (req, res) => {
     try {
@@ -72,7 +112,8 @@ export const deleteResenha = async (req, res) => {
 
         return res.json({ message: 'Resenha deletada.' })
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao deletar resenha.' })
+        console.error('deleteResenha:', err)
+        return res.status(500).json({ error: 'Erro ao deletar resenha.' })
     }
 }
 
@@ -88,11 +129,15 @@ export const getBookResenhas = async (req, res) => {
             order: [['createdAt', 'DESC']]
         })
 
-        const average = resenhas.length ? (resenhas.reduce((sum, r) => sum + parseFloat(r.score), 0) / resenhas.length).toFixed(1) : null
+        const comNota = resenhas.filter(r => r.score !== null && r.score !== undefined)
+        const average = comNota.length
+            ? (comNota.reduce((sum, r) => sum + parseFloat(r.score), 0) / comNota.length).toFixed(1)
+            : null
 
         return res.json({ average, total: resenhas.length, resenhas })
     } catch (err) {
-        return res.status(500).json({ error: 'Erro ao carreegar resenhas do livro' })
+        console.error('getBookResenhas:', err)
+        return res.status(500).json({ error: 'Erro ao carregar resenhas do livro.' })
     }
 }
 
@@ -110,6 +155,7 @@ export const getUserResenhas = async (req, res) => {
 
         return res.json(resenhas)
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao carregar resenhas do usuário' })
+        console.error('getUserResenhas:', err)
+        return res.status(500).json({ error: 'Erro ao carregar resenhas do usuário.' })
     }
 }
