@@ -2,13 +2,27 @@ import Resenha from '../models/Resenha.js'
 import Book from '../models/Book.js'
 import User from '../models/User.js'
 
-const NOTA_MAX = 10
-const FIELDS = ['body', 'score', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
-const NOTAS = ['score', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
-const NOTAS_OBRIGATORIAS = ['score', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact']
+const NOTA_MIN = 1
+const NOTA_MAX = 5
+const FIELDS = ['body', 'writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
+const NOTAS = ['writing', 'plot', 'characters', 'pacing', 'emotionalImpact', 'worldbuilding']
+const NOTAS_OBRIGATORIAS = ['writing', 'plot', 'characters', 'pacing', 'emotionalImpact']
 
 const pick = (obj, keys) =>
     Object.fromEntries(keys.filter(k => obj[k] !== undefined).map(k => [k, obj[k]]))
+
+// Média dos critérios preenchidos (worldbuilding só entra se existir)
+function calcularScore(dados) {
+    const valores = NOTAS
+        .map(k => dados[k])
+        .filter(v => v !== undefined && v !== null)
+        .map(Number)
+
+    if (valores.length === 0) return null
+
+    const media = valores.reduce((soma, v) => soma + v, 0) / valores.length
+    return Number(media.toFixed(1))
+}
 
 // Retorna uma mensagem de erro, ou null se estiver tudo certo
 function validar(dados, { parcial = false } = {}) {
@@ -24,8 +38,8 @@ function validar(dados, { parcial = false } = {}) {
     for (const k of NOTAS) {
         if (dados[k] === undefined || dados[k] === null) continue
         const n = Number(dados[k])
-        if (isNaN(n) || n < 0 || n > NOTA_MAX) {
-            return `A nota deve ser um número entre 0 e ${NOTA_MAX}.`
+        if (!Number.isInteger(n) || n < NOTA_MIN || n > NOTA_MAX) {
+            return `Cada nota deve ser um número inteiro de ${NOTA_MIN} a ${NOTA_MAX}.`
         }
     }
 

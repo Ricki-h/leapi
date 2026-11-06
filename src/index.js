@@ -24,7 +24,18 @@ import './models/Follow.js'
 
 const app = express()
 
-app.use(cors())
+app.set('trust proxy', 1)
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.FRONT_URL, 
+].filter(Boolean)
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}))
+
 app.use(express.json())
 app.use(cookieParser())
 
