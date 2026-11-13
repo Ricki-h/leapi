@@ -3,6 +3,7 @@ import Like from '../models/Like.js'
 import User from '../models/User.js'
 import sequelize from '../config/database.js'
 import { Op } from 'sequelize'
+import { audit } from '../services/audit.js'
 
 const USER_PUBLIC_ATTRIBUTES = ['id', 'name', 'username', 'avatarUrl']
 
@@ -59,6 +60,7 @@ export const createPost = async (req, res) => {
 
     return res.status(201).json(post)
   } catch (err) {
+    req.log.error({ err }, 'Erro em createPost')
     return res.status(500).json({ error: 'Erro interno ao criar post.' })
   }
 }
@@ -72,12 +74,22 @@ export const deletePost = async (req, res) => {
     }
 
     if (post.userId !== req.user.id && req.user.role !== 'admin') {
+      req.log.warn({ event: 'post.delete_forbidden', postId: post.id }, 'Tentativa de apagar post de outro usuário')
       return res.status(403).json({ error: 'Sem permissão.' })
     }
 
+    const byAdmin = post.userId !== req.user.id
+    const info = { postId: post.id, ownerId: post.userId }
+
     await post.destroy()
+
+    if (byAdmin) {
+      audit(req, 'post.deleted_by_admin', info)
+    }
+
     return res.json({ message: 'Post deletado com sucesso.' })
   } catch (err) {
+    req.log.error({ err }, 'Erro em deletePost')
     return res.status(500).json({ error: 'Erro interno ao excluir post.' })
   }
 }
@@ -114,6 +126,7 @@ export const getPost = async (req, res) => {
 
     return res.json(post)
   } catch (err) {
+    req.log.error({ err }, 'Erro em getPost')
     return res.status(500).json({ error: 'Erro interno ao buscar post.' })
   }
 }
@@ -133,6 +146,7 @@ export const getUserPosts = async (req, res) => {
 
     return res.json(posts)
   } catch (err) {
+    req.log.error({ err }, 'Erro em getUserPosts')
     return res.status(500).json({ error: 'Erro interno ao buscar posts do usuário.' })
   }
 }
@@ -160,6 +174,7 @@ export const getUserPostsAndReplies = async (req, res) => {
 
     return res.json(posts)
   } catch (err) {
+    req.log.error({ err }, 'Erro em getUserPostsAndReplies')
     return res.status(500).json({ error: 'Erro interno ao buscar postagens e respostas.' })
   }
 }
@@ -193,6 +208,7 @@ export const getFeed = async (req, res) => {
       seed
     })
   } catch (err) {
+    req.log.error({ err }, 'Erro em getFeed')
     return res.status(500).json({ error: 'Erro interno ao carregar feed.' })
   }
 }
@@ -234,6 +250,7 @@ export const getFollowingFeed = async (req, res) => {
       nextPage: hasMore ? page + 1 : null
     })
   } catch (err) {
+    req.log.error({ err }, 'Erro em getFollowingFeed')
     return res.status(500).json({ error: 'Erro interno ao carregar feed de seguidos.' })
   }
 }
@@ -258,6 +275,7 @@ export const likePost = async (req, res) => {
 
     return res.status(201).json({ message: 'Post curtido.' })
   } catch (err) {
+    req.log.error({ err }, 'Erro em likePost')
     return res.status(500).json({ error: 'Erro ao curtir post.' })
   }
 }
@@ -274,6 +292,7 @@ export const unlikePost = async (req, res) => {
 
     return res.json({ message: 'Curtida removida.' })
   } catch (err) {
+    req.log.error({ err }, 'Erro em unlikePost')
     return res.status(500).json({ error: 'Erro ao descurtir post.' })
   }
 }

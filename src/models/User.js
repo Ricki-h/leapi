@@ -16,8 +16,8 @@ const User = sequelize.define('User', {
     allowNull: false,
     unique: true,
     validate: {
-      is: /^[a-z0-9_.]+/i,
-      len: [3-30]
+      is: /^[a-z0-9_.]+$/i,
+      len: [3, 30]
     }
   },
   email: {

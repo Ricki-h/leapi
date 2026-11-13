@@ -158,7 +158,7 @@ export const searchBooks = async (req, res) => {
         let externalResults = [];
         if (searchQuery) {
             try {
-                console.log(`Pesquisando nas APIs externas por: "${searchQuery}"`);
+                req.log.debug({ searchQuery }, 'Pesquisando nas APIs externas');
 
                 const [googleResults, openLibraryResults] = await Promise.all([
                     searchGoogleBooks(searchQuery),
@@ -166,17 +166,20 @@ export const searchBooks = async (req, res) => {
                 ]);
 
                 externalResults = [...(googleResults || []), ...(openLibraryResults || [])];
-                console.log(`Encontrados: ${externalResults.length} livros nas APIs.`);
+                req.log.info(
+                    { event: 'books.external_search', searchQuery, found: externalResults.length },
+                    'Busca em APIs externas concluída'
+                );
 
                 if (externalResults.length > 0) {
                     
                     await Promise.all(
                         externalResults.map(book => saveBook(book))
                     );
-                    console.log('Livros externos salvos no banco local com sucesso!');
+                    req.log.info({ event: 'books.external_saved', count: externalResults.length }, 'Livros externos salvos no banco local');
                 }
             } catch (apiError) {
-                console.error('Erro detalhado no bloco externo (salvamento ou API):', apiError);
+                req.log.error({ err: apiError, searchQuery }, 'Erro no bloco externo (salvamento ou API)');
             }
         }
 
@@ -217,8 +220,8 @@ export const searchBooks = async (req, res) => {
         });
 
     } catch (err) {
-        console.error('Error in searchBooks:', err.message);
-        res.status(500).json({ error: 'Erro interno do servidor' });
+        req.log.error({ err }, 'Erro em searchBooks');
+        return res.status(500).json({ error: 'Erro interno do servidor' });
     }
 };
 
@@ -271,7 +274,7 @@ export const getBook = async (req, res) => {
                     }
                 }
             } catch (err) {
-                console.error('Erro buscando autor:', err.message);
+                req.log.warn({ err, bookId: book.id }, 'Erro buscando autor na Open Library');
             }
         }
 
@@ -284,6 +287,7 @@ export const getBook = async (req, res) => {
 
         return res.json(updatedBook);
     } catch (err) {
-        return res.status(500).json({ error: err.message });
+        req.log.error({ err }, 'Erro em getBook');
+        return res.status(500).json({ error: 'Erro ao buscar livro.' });
     }
 };

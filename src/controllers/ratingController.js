@@ -1,6 +1,7 @@
 import Book from '../models/Book.js'
 import Rating from '../models/Rating.js'
 import User from '../models/User.js'
+import { audit } from '../services/audit.js'
 
 export const createRating = async (req, res) => {
     try {
@@ -34,7 +35,7 @@ export const createRating = async (req, res) => {
 
         return res.status(201).json(rating)
     } catch (err) {
-        console.error('Erro ao criar avaliação:', err)
+        req.log.error({ err }, 'Erro ao criar avaliação')
         return res.status(500).json({ error: 'Erro interno no servidor.' })
     }
 }
@@ -64,7 +65,7 @@ export const updateRating = async (req, res) => {
 
         return res.json(rating)
     } catch (err) {
-        console.error('Erro ao atualizar avaliação:', err)
+        req.log.error({ err }, 'Erro ao atualizar avaliação')
         return res.status(500).json({ error: 'Erro interno no servidor.' })
     }
 }
@@ -83,11 +84,18 @@ export const deleteRating = async (req, res) => {
             return res.status(404).json({ error: 'Avaliação não encontrada.' })
         }
 
+        const byAdmin = rating.userId !== req.user.id
+        const info = { ratingId: rating.id, ownerId: rating.userId, bookId }
+
         await rating.destroy()
+
+        if (byAdmin) {
+            audit(req, 'rating.deleted_by_admin', info)
+        }
 
         return res.json({ message: 'Avaliação removida com sucesso.' })
     } catch (err) {
-        console.error('Erro ao remover avaliação:', err)
+        req.log.error({ err }, 'Erro ao remover avaliação')
         return res.status(500).json({ error: 'Erro interno no servidor.' })
     }
 }
@@ -123,7 +131,7 @@ export const getBookRatings = async (req, res) => {
             ratings
         })
     } catch (err) {
-        console.error('Erro ao buscar avaliações:', err)
+        req.log.error({ err }, 'Erro ao buscar avaliações')
         return res.status(500).json({ error: 'Erro interno no servidor.' })
     }
 }
