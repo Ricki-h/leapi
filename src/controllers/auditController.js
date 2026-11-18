@@ -1,5 +1,6 @@
 import { Op } from 'sequelize'
 import AuditLog from '../models/AuditLog.js'
+import User from '../models/User.js'
 
 export const getAuditLogs = async (req, res) => {
     try {
@@ -35,5 +36,26 @@ export const getAuditLogs = async (req, res) => {
     } catch (err) {
         req.log.error({ err }, 'Erro em getAuditLogs')
         return res.status(500).json({ error: 'Erro ao buscar logs.' })
+    }
+}
+
+export const getAuditLogById = async (req, res) => {
+    try {
+        const log = await AuditLog.findByPk(req.params.id)
+        if (!log) {
+            return res.status(404).json({ error: 'Log não encontrado.' })
+        }
+
+        let user = null
+        if (log.userId) {
+            user = await User.findByPk(log.userId, {
+                attributes: ['id', 'name', 'username', 'avatarUrl', 'email', 'role']
+            })
+        }
+
+        return res.json({ log, user })
+    } catch (err) {
+        req.log?.error({ err }, 'Erro em getAuditLogById')
+        return res.status(500).json({ error: 'Erro ao buscar detalhes do log.' })
     }
 }
