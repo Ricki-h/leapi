@@ -277,3 +277,36 @@ export const unlikePost = async (req, res) => {
     return res.status(500).json({ error: 'Erro ao descurtir post.' })
   }
 }
+
+export const searchPosts = async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim()
+
+    if (!q) {
+      return res.json([])
+    }
+
+    const userId = req.user?.id || null
+    const { attributes, binds } = getPostSocialAttributes(userId, 'Post')
+    const escapedQuery = q.replace(/[\\%_]/g, '\\$&')
+
+    const posts = await Post.findAll({
+      where: {
+        parentId: null,
+        content: {
+          [Op.iLike]: `%${escapedQuery}%`
+        }
+      },
+      bind: binds,
+      attributes: { include: attributes },
+      include: [{ model: User, as: 'user', attributes: USER_PUBLIC_ATTRIBUTES }],
+      order: [['createdAt', 'DESC']],
+      limit: 30
+    })
+
+    return res.json(posts)
+  } catch (err) {
+    console.error('Erro ao pesquisar posts:', err)
+    return res.status(500).json({ error: 'Erro interno ao pesquisar posts.' })
+  }
+}
