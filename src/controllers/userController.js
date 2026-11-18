@@ -336,3 +336,36 @@ export const removeAvatar = async (req, res) => {
         return res.status(500).json({ error: 'Erro ao remover foto de perfil.' })
     }
 }
+
+const escapeLike = (text) => text.replace(/[\\%_]/g, '\\$&')
+
+export const searchUsers = async (req, res) => {
+    try {
+        const { q } = req.query
+
+        // q pode chegar como array (?q=a&q=b) ou objeto, então confere o tipo
+        if (typeof q !== 'string' || !q.trim()) {
+            return res.json([])
+        }
+
+        const term = escapeLike(q.trim().replace(/^@/, '').slice(0, 50))
+        const pattern = `%${term}%`
+
+        const users = await User.findAll({
+            where: {
+                [Op.or]: [
+                    { name: { [Op.iLike]: pattern } },
+                    { username: { [Op.iLike]: pattern } }
+                ]
+            },
+            attributes: ['id', 'name', 'username', 'avatarUrl'],
+            order: [['username', 'ASC']],
+            limit: 10
+        })
+
+        return res.json(users)
+    } catch (err) {
+        console.error('Erro em searchUsers:', err)
+        return res.status(500).json({ error: 'Erro ao pesquisar usuários.' })
+    }
+}

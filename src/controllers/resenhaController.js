@@ -173,3 +173,31 @@ export const getUserResenhas = async (req, res) => {
         return res.status(500).json({ error: 'Erro ao carregar resenhas do usuário.' })
     }
 }
+
+export const getResenhaById = async (req, res) => {
+    try {
+        const resenha = await Resenha.findByPk(req.params.id, {
+            include: [
+                {
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'username', 'avatarUrl']
+                },
+                {
+                    model: Book,
+                    as: 'book',
+                    attributes: ['id', 'title', 'coverUrl']
+                }
+            ]
+        })
+
+        if (!resenha) {
+            return res.status(404).json({ error: 'Resenha não encontrada.' })
+        }
+
+        return res.json(resenha)
+    } catch (err) {
+        console.error('getResenhaById:', err)
+        return res.status(500).json({ error: 'Erro ao carregar resenha.' })
+    }
+}
