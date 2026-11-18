@@ -127,3 +127,24 @@ export const getBookRatings = async (req, res) => {
         return res.status(500).json({ error: 'Erro interno no servidor.' })
     }
 }
+
+export const getUserRatings = async (req, res) => {
+    try {
+        const { userId } = req.params
+
+        const ratings = await Rating.findAll({
+            where: { userId },
+            include: [{
+                model: Book,
+                as: 'book',
+                attributes: ['id', 'title', 'coverUrl', 'publishedYear']
+            }],
+            order: [['createdAt', 'DESC']]
+        })
+
+        return res.json(ratings)
+    } catch (err) {
+        console.error('Erro ao buscar avaliações do usuário:', err)
+        return res.status(500).json({ error: 'Erro interno no servidor.' })
+    }
+}
