@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
 import { Op } from 'sequelize'
 import BookList from '../models/BookList.js'
+import { audit } from '../services/audit.js'
 
 const cookieOptions = {
     httpOnly: true,
@@ -22,6 +23,10 @@ const publicUser = (user) => ({
 export const register = async (req, res) => {
     try {
         const { name, username, email, password, birthDate } = req.body
+
+        if (!name || !username || !email || !password || !birthDate) {
+            return res.status(400).json({ error: 'Preencha todos os campos.' })
+        }
 
         const userExists = await User.findOne({ where: {
             [Op.or]: [
@@ -60,15 +65,29 @@ export const register = async (req, res) => {
 
         res.cookie('auth_token', token, cookieOptions)
 
+        // req.user ainda não existe aqui, então o id vai no metadata
+        audit(req, 'auth.register', { userId: user.id, username: user.username })
+
         return res.json({ message: 'Login realizado com sucesso!', user: publicUser(user) })
     } catch (err) {
-        return res.status(400).json({ error: err.message })
+        if (err.name === 'SequelizeValidationError') {
+            return res.status(400).json({ error: err.errors.map(e => e.message).join(' ') })
+        }
+        if (err.name === 'SequelizeUniqueConstraintError') {
+            return res.status(400).json({ error: 'Email ou nome de usuário já cadastrado.' })
+        }
+        req.log.error({ err }, 'Erro em register')
+        return res.status(500).json({ error: 'Erro interno do servidor.' })
     }
 }
 
 export const login = async (req, res) => {
     try {
         const { login, password } = req.body
+
+        if (!login || !password) {
+            return res.status(400).json({ error: 'Informe login e senha.' })
+        }
 
         const user = await User.findOne({ where: {
             [Op.or]: [
@@ -77,11 +96,15 @@ export const login = async (req, res) => {
             ]
         } })
         if (!user) {
+            req.log.warn({ event: 'auth.login_failed' }, 'Login falhou: usuário não encontrado')
+            audit(req, 'auth.login_failed', { login, reason: 'user_not_found' })
             return res.status(401).json({ error: 'Email ou senha inválidos.' })
         }
 
         const passwordMatch = await bcrypt.compare(password, user.password)
         if (!passwordMatch) {
+            req.log.warn({ event: 'auth.login_failed', targetId: user.id }, 'Login falhou: senha incorreta')
+            audit(req, 'auth.login_failed', { login, reason: 'wrong_password', targetId: user.id })
             return res.status(401).json({ error: 'Email ou senha inválidos.' })
         }
 
@@ -93,9 +116,12 @@ export const login = async (req, res) => {
 
         res.cookie('auth_token', token, cookieOptions)
 
+        audit(req, 'auth.login', { userId: user.id })
+
         return res.json({ message: 'Login realizado com sucesso!', user: publicUser(user) })
     } catch (err) {
-        return res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em login')
+        return res.status(500).json({ error: 'Erro interno do servidor.' })
     }
 }
 

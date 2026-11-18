@@ -1,6 +1,7 @@
 import Resenha from '../models/Resenha.js'
 import Book from '../models/Book.js'
 import User from '../models/User.js'
+import { audit } from '../services/audit.js'
 
 const NOTA_MIN = 1
 const NOTA_MAX = 5
@@ -77,7 +78,7 @@ export const createResenha = async (req, res) => {
 
         return res.status(201).json(resenha)
     } catch (err) {
-        console.error('createResenha:', err)
+        req.log.error({ err }, 'Erro em createResenha')
         return res.status(500).json({ error: 'Erro ao criar uma resenha.' })
     }
 }
@@ -103,7 +104,7 @@ export const updateResenha = async (req, res) => {
 
         return res.json(resenha)
     } catch (err) {
-        console.error('updateResenha:', err)
+        req.log.error({ err }, 'Erro em updateResenha')
         return res.status(500).json({ error: 'Erro ao atualizar resenha.' })
     }
 }
@@ -119,14 +120,22 @@ export const deleteResenha = async (req, res) => {
         }
 
         if (resenha.userId !== req.user.id && req.user.role !== 'admin') {
+            req.log.warn({ event: 'resenha.delete_forbidden', resenhaId: resenha.id }, 'Tentativa de apagar resenha de outro usuário')
             return res.status(403).json({ error: 'Sem permissão.' })
         }
 
+        const byAdmin = resenha.userId !== req.user.id
+        const info = { resenhaId: resenha.id, ownerId: resenha.userId, bookId: resenha.bookId }
+
         await resenha.destroy()
+
+        if (byAdmin) {
+            audit(req, 'resenha.deleted_by_admin', info)
+        }
 
         return res.json({ message: 'Resenha deletada.' })
     } catch (err) {
-        console.error('deleteResenha:', err)
+        req.log.error({ err }, 'Erro em deleteResenha')
         return res.status(500).json({ error: 'Erro ao deletar resenha.' })
     }
 }
@@ -150,7 +159,7 @@ export const getBookResenhas = async (req, res) => {
 
         return res.json({ average, total: resenhas.length, resenhas })
     } catch (err) {
-        console.error('getBookResenhas:', err)
+        req.log.error({ err }, 'Erro em getBookResenhas')
         return res.status(500).json({ error: 'Erro ao carregar resenhas do livro.' })
     }
 }
@@ -169,7 +178,7 @@ export const getUserResenhas = async (req, res) => {
 
         return res.json(resenhas)
     } catch (err) {
-        console.error('getUserResenhas:', err)
+        req.log.error({ err }, 'Erro em getUserResenhas')
         return res.status(500).json({ error: 'Erro ao carregar resenhas do usuário.' })
     }
 }

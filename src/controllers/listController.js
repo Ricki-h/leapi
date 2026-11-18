@@ -22,7 +22,8 @@ export const getLists = async (req, res) => {
 
         return res.json(lists)
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em getLists')
+        return res.status(500).json({ error: 'Erro ao buscar listas.' })
     }
 }
 
@@ -46,9 +47,19 @@ export const getList = async (req, res) => {
                 }]
         })
 
+        if (!list) {
+            return res.status(404).json({ error: 'Lista não encontrada.' })
+        }
+
+        // Lista privada só pode ser vista pela dona
+        if (list.isPrivate && list.userId !== req.user?.id) {
+            return res.status(403).json({ error: 'Sem permissão.' })
+        }
+
         return res.json(list)
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em getList')
+        return res.status(500).json({ error: 'Erro ao buscar lista.' })
     }
 }
 
@@ -70,7 +81,8 @@ export const getMyLists = async (req, res) => {
 
         return res.json(lists)
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em getMyLists')
+        return res.status(500).json({ error: 'Erro ao buscar suas listas.' })
     }
 }
 
@@ -85,9 +97,10 @@ export const createList = async (req, res) => {
             userId: req.user.id
         })
 
-        res.status(201).json(list)
+        return res.status(201).json(list)
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em createList')
+        return res.status(500).json({ error: 'Erro ao criar lista.' })
     }
 }
 
@@ -96,15 +109,15 @@ export const updateList = async (req, res) => {
         const list = await BookList.findByPk(req.params.id)
 
         if (!list) {
-            res.status(404).json({ error: 'Lista não encontrada.' })
+            return res.status(404).json({ error: 'Lista não encontrada.' })
         }
 
         if (list.userId !== req.user.id) {
-            res.status(403).json({ error: 'Sem permissão.' })
+            return res.status(403).json({ error: 'Sem permissão.' })
         }
 
         if (list.isDefault) {
-            res.status(400).json({ error: 'Listas Padrões não podem ser editadas.' })
+            return res.status(400).json({ error: 'Listas Padrões não podem ser editadas.' })
         }
 
         await list.update({
@@ -114,7 +127,8 @@ export const updateList = async (req, res) => {
 
         return res.json(list)
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em updateList')
+        return res.status(500).json({ error: 'Erro ao editar lista.' })
     }
 }
 
@@ -123,22 +137,23 @@ export const deleteList = async(req, res) => {
         const list = await BookList.findByPk(req.params.id)
 
         if (!list) {
-            res.status(404).json({ error: 'Lista não encontrada.' })
+            return res.status(404).json({ error: 'Lista não encontrada.' })
         }
 
         if (list.userId !== req.user.id) {
-            res.status(403).json({ error: 'Sem permissão.' })
+            return res.status(403).json({ error: 'Sem permissão.' })
         }
 
         if (list.isDefault) {
-            res.status(400).json({ error: 'Listas Padrões não podem ser editadas.' })
+            return res.status(400).json({ error: 'Listas Padrões não podem ser editadas.' })
         }
 
         await list.destroy()
 
         return res.json({ message: 'Lista deletada.' })
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em deleteList')
+        return res.status(500).json({ error: 'Erro ao deletar lista.' })
     }
 }
 
@@ -169,7 +184,8 @@ export const addBookToList = async (req, res) => {
 
         return res.status(201).json(item)
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em addBookToList')
+        return res.status(500).json({ error: 'Erro ao adicionar livro à lista.' })
     }
 }
 
@@ -197,6 +213,7 @@ export const removeBookFromList = async (req, res) => {
 
         return res.json({ message: 'Livro removido da lista.' })
     } catch (err) {
-        res.status(500).json({ error: err.message })
+        req.log.error({ err }, 'Erro em removeBookFromList')
+        return res.status(500).json({ error: 'Erro ao remover livro da lista.' })
     }
 }

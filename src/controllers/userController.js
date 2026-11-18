@@ -3,6 +3,8 @@ import User from '../models/User.js'
 import Follow from '../models/Follow.js'
 import Post from '../models/Post.js'
 import cloudinary from '../config/cloudinary.js'
+import logger from '../config/logger.js'
+import { audit } from '../services/audit.js'
 import { Op } from 'sequelize'
 import sequelize from '../config/database.js'
 
@@ -13,7 +15,7 @@ async function deleteAvatarFromCloud(user) {
     try {
         await cloudinary.uploader.destroy(user.avatarCloudinaryId)
     } catch (err) {
-        console.error('Falha ao apagar avatar no Cloudinary:', err)
+        logger.error({ err, userId: user.id }, 'Falha ao apagar avatar no Cloudinary')
     }
 }
 
@@ -57,7 +59,7 @@ export const getUser = async (req, res) => {
             isFollowing: Boolean(isFollowing)
         })
     } catch (err) {
-        console.error('Erro em getUser:', err)
+        req.log.error({ err }, 'Erro em getUser')
         return res.status(500).json({ error: 'Erro ao buscar usuário.' })
     }
 }
@@ -91,7 +93,7 @@ export const updateMe = async (req, res) => {
         if (err.name === 'SequelizeUniqueConstraintError') {
             return res.status(409).json({ error: 'Nome de usuário já cadastrado.' })
         }
-        console.error('Erro em updateMe:', err)
+        req.log.error({ err }, 'Erro em updateMe')
         return res.status(500).json({ error: 'Erro ao editar usuário.' })
     }
 }
@@ -108,15 +110,18 @@ export const updatePassword = async (req, res) => {
 
         const passwordMatch = currentPassword ? await bcrypt.compare(currentPassword, user.password) : false
         if (!passwordMatch) {
+            req.log.warn({ event: 'user.password_change_failed' }, 'Senha atual incorreta ao trocar senha')
             return res.status(401).json({ error: 'Senha atual incorreta.' })
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10)
         await user.update({ password: hashedPassword })
 
+        audit(req, 'user.password_changed')
+
         return res.json({ message: 'Senha alterada com sucesso.' })
     } catch (err) {
-        console.error('Erro em updatePassword:', err)
+        req.log.error({ err }, 'Erro em updatePassword')
         return res.status(500).json({ error: 'Erro ao atualizar a senha.' })
     }
 }
@@ -131,9 +136,11 @@ export const promoteUser = async (req, res) => {
 
         await user.update({ role: 'admin' })
 
+        audit(req, 'user.promoted', { targetId: user.id, targetUsername: user.username })
+
         return res.json({ message: `${user.name} agora é um administrador.` })
     } catch (err) {
-        console.error('Erro em promoteUser:', err)
+        req.log.error({ err }, 'Erro em promoteUser')
         return res.status(500).json({ error: 'Erro ao promover usuário.' })
     }
 }
@@ -146,11 +153,15 @@ export const deleteUser = async (req, res) => {
             return res.status(404).json({ error: 'Usuário não encontrado.' })
         }
 
+        const target = { targetId: user.id, targetUsername: user.username }
+
         await deleteUserData(user)
+
+        audit(req, 'user.deleted_by_admin', target)
 
         return res.json({ message: 'Usuário deletado.' })
     } catch (err) {
-        console.error('Erro em deleteUser:', err)
+        req.log.error({ err }, 'Erro em deleteUser')
         return res.status(500).json({ error: 'Erro ao deletar usuário.' })
     }
 }
@@ -163,11 +174,15 @@ export const deleteMe = async (req, res) => {
             return res.status(404).json({ error: 'Usuário não encontrado.' })
         }
 
+        const username = user.username
+
         await deleteUserData(user)
+
+        audit(req, 'user.deleted_self', { username })
 
         return res.json({ message: 'Conta deletada com sucesso.' })
     } catch (err) {
-        console.error('Erro em deleteMe:', err)
+        req.log.error({ err }, 'Erro em deleteMe')
         return res.status(500).json({ error: 'Erro ao deletar usuário.' })
     }
 }
@@ -195,7 +210,7 @@ export const followUser = async (req, res) => {
 
         return res.json({ message: `Você está seguindo @${following.username}.` })
     } catch (err) {
-        console.error('Erro em followUser:', err)
+        req.log.error({ err }, 'Erro em followUser')
         return res.status(500).json({ error: 'Erro ao seguir usuário.' })
     }
 }
@@ -228,7 +243,7 @@ export const getFollowers = async (req, res) => {
             hasMore
         })
     } catch (err) {
-        console.error('Erro em getFollowers:', err)
+        req.log.error({ err }, 'Erro em getFollowers')
         return res.status(500).json({ error: 'Erro ao buscar seguidores do usuário.' })
     }
 }
@@ -261,7 +276,7 @@ export const getFollowing = async (req, res) => {
             hasMore
         })
     } catch (err) {
-        console.error('Erro em getFollowing:', err)
+        req.log.error({ err }, 'Erro em getFollowing')
         return res.status(500).json({ error: 'Erro ao buscar quem o usuário está seguindo.' })
     }
 }
@@ -299,18 +314,19 @@ export const updateAvatar = async (req, res) => {
                 avatarCloudinaryId: uploadResult.public_id
             })
         } catch (dbErr) {
-            await cloudinary.uploader.destroy(uploadResult.public_id).catch(console.error)
+            await cloudinary.uploader.destroy(uploadResult.public_id)
+                .catch(err => req.log.error({ err }, 'Falha ao desfazer upload no Cloudinary'))
             throw dbErr
         }
 
         if (oldCloudinaryId) {
             await cloudinary.uploader.destroy(oldCloudinaryId)
-                .catch(err => console.error('Falha ao apagar foto antiga:', err))
+                .catch(err => req.log.error({ err, oldCloudinaryId }, 'Falha ao apagar foto antiga'))
         }
 
         return res.json({ avatarUrl: user.avatarUrl })
     } catch (err) {
-        console.error('Erro em updateAvatar:', err)
+        req.log.error({ err }, 'Erro em updateAvatar')
         return res.status(500).json({ error: 'Erro ao atualizar a foto de perfil.' })
     }
 }
@@ -327,12 +343,12 @@ export const removeAvatar = async (req, res) => {
 
         if (oldCloudinaryId) {
             await cloudinary.uploader.destroy(oldCloudinaryId)
-                .catch(err => console.error('Falha ao remover foto:', err))
+                .catch(err => req.log.error({ err, oldCloudinaryId }, 'Falha ao remover foto'))
         }
 
         return res.json({ message: 'Foto de perfil removida.', avatarUrl: DEFAULT_AVATAR_URL })
     } catch (err) {
-        console.error('Erro em removeAvatar:', err)
+        req.log.error({ err }, 'Erro em removeAvatar')
         return res.status(500).json({ error: 'Erro ao remover foto de perfil.' })
     }
 }
